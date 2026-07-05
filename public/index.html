@@ -161,16 +161,44 @@
     background: #3a2f10; border: 1px solid #6b5518; border-radius: 8px; padding: 10px 12px;
     color: #ffd93d; font-size: 12px; line-height: 1.6;
   }
+
+  /* ── 모드 선택 (1:1 / 2:2) ── */
+  .mode-row { display: flex; gap: 8px; margin-bottom: 4px; }
+  .mode-btn {
+    flex: 1; padding: 10px; border-radius: 10px; border: 2px solid var(--line);
+    background: var(--panel2); color: var(--dim); cursor: pointer; font-size: 13px; font-weight: 700;
+  }
+  .mode-btn.sel { border-color: var(--accent); color: var(--accent); background: #33350f; }
+
+  /* ── 로비 플레이어 목록 (1:1/2:2 공용) ── */
+  .player-list { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .player-chip {
+    display: flex; align-items: center; gap: 6px; background: var(--panel); border: 2px solid var(--line);
+    border-radius: 10px; padding: 8px 12px; font-size: 13px; flex: 1; min-width: 130px;
+  }
+  .player-chip.team1 { border-left: 4px solid #4cd964; }
+  .player-chip.team2 { border-left: 4px solid #ff9f43; }
+  .player-chip .pname { font-weight: 800; }
+  .player-chip .pstate { margin-left: auto; font-size: 11px; color: var(--dim); }
+  .player-chip.ready .pstate { color: var(--p1); font-weight: 700; }
+  .player-chip.me { box-shadow: 0 0 0 2px var(--accent) inset; }
 </style>
 </head>
 <body>
 
 <h1>포트리스 미니</h1>
-<div class="sub">TANK ARTILLERY · 2 PLAYERS · LAN</div>
+<div class="sub">TANK ARTILLERY · LAN</div>
 
 <!-- ═══════════ 방 만들기/입장 화면 ═══════════ -->
 <div id="landingScreen" class="screen on" style="max-width:460px;">
   <div class="landing-box">
+    <div class="landing-option">
+      <h3>■ 게임 방식</h3>
+      <div class="mode-row">
+        <button class="mode-btn sel" id="mode1v1Btn">1:1 대전 (2인)</button>
+        <button class="mode-btn" id="mode2v2Btn">2:2 팀전 (4인)</button>
+      </div>
+    </div>
     <div class="landing-option">
       <h3>■ 새 방 만들기</h3>
       <button class="landing-btn" id="createRoomBtn" style="width:100%;">방 만들고 링크 공유하기</button>
@@ -188,10 +216,10 @@
   <div class="howto-box">
     <h3>▶ 시작하는 법</h3>
     <ol>
-      <li>"방 만들고 링크 공유하기" 클릭</li>
-      <li>🔗 링크 복사 버튼으로 상대에게 링크 전달 (카톡/디스코드 등)</li>
-      <li>상대가 링크 클릭해서 들어오면 준비 완료</li>
-      <li>각자 탱크 선택 → P1이 맵 선택 → 둘 다 "준비 완료!" → 게임 시작</li>
+      <li>게임 방식(1:1 또는 2:2) 선택 후 "방 만들고 링크 공유하기" 클릭</li>
+      <li>🔗 링크 복사 버튼으로 함께할 사람에게 링크 전달 (카톡/디스코드 등)</li>
+      <li>2:2는 4명이 같은 링크로 입장 — 먼저 들어온 2명이 팀A, 나머지 2명이 팀B가 됩니다</li>
+      <li>각자 탱크 선택 → 방장(P1)이 맵 선택 → 전원 "준비 완료!" → 게임 시작</li>
     </ol>
 
     <h3>▶ 조작법</h3>
@@ -205,7 +233,7 @@
     <div class="howto-warn">
       ⚠️ PC 브라우저 전용입니다 (키보드로 조작해서 모바일에서는 화면만 뜨고 조작이 안 돼요).<br>
       처음 접속 시 로딩에 20~30초 정도 걸릴 수 있어요 — 새로고침 연타하지 말고 잠깐 기다려주세요.<br>
-      서로 다른 방 코드를 쓰면 여러 쌍이 동시에 플레이할 수 있어요.
+      서로 다른 방 코드를 쓰면 여러 그룹이 동시에 플레이할 수 있어요.
     </div>
   </div>
 </div>
@@ -214,13 +242,10 @@
 <div id="lobbyScreen" class="screen">
   <div class="room-box">
     <span>방 코드</span> <span class="code" id="roomCodeText">----</span>
+    <span id="modeTag" class="hint" style="margin-left:8px;">1:1</span>
     <button class="copy-btn" id="copyLinkBtn">🔗 링크 복사</button>
   </div>
-  <div class="status-bar">
-    <div>나: <span id="myBadge" class="badge wait">접속 중...</span></div>
-    <div id="lobbyMsg" class="hint">상대를 기다리는 중...</div>
-    <div>상대: <span id="foeBadge" class="badge wait">대기 중</span></div>
-  </div>
+  <div class="player-list" id="playerList"></div>
 
   <div class="section-title">■ 탱크 선택 (클릭)</div>
   <div class="tank-grid" id="tankGrid"></div>
@@ -252,6 +277,9 @@
     <div class="hud-box keys">
       <kbd>A</kbd><kbd>D</kbd> 이동 &nbsp; <kbd>←</kbd><kbd>→</kbd> 각도 &nbsp;
       <kbd>1</kbd><kbd>2</kbd> 무기 &nbsp; <kbd>SPACE</kbd> 누르고 있다가 떼면 발사!
+    </div>
+    <div class="hud-box">
+      <button class="wbtn" id="muteBtn" style="min-width:auto;">🔊</button>
     </div>
   </div>
 </div>
@@ -373,7 +401,8 @@ function genTerrain(mapId, seed) {
 /* ═══════════════════════════════════════════════
    네트워크 & 로비
    ═══════════════════════════════════════════════ */
-let ws, myId = 0, roomCode = '', lobby = { picks: [null, null], ready: [false, false], map: 0 };
+let ws, myId = 0, myTeam = 1, roomCode = '', selectedMode = '1v1', mode = '1v1', numPlayers = 2;
+let lobby = { picks: [null, null], ready: [false, false], map: 0 };
 let G = null; // 게임 상태
 
 const $ = (id) => document.getElementById(id);
@@ -389,19 +418,23 @@ function genCode(len = 4) {
   for (let i = 0; i < len; i++) s += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
   return s;
 }
-function roomUrl(code) {
-  return location.origin + location.pathname + '?room=' + code;
+function roomUrl(code, m) {
+  return location.origin + location.pathname + '?room=' + code + '&mode=' + (m || selectedMode);
 }
 
 /* ── 랜딩 화면: URL에 방 코드가 있으면 바로 접속, 없으면 만들기/입장 화면 ── */
 function initLanding() {
   const params = new URLSearchParams(location.search);
   const codeFromUrl = (params.get('room') || '').toUpperCase().trim();
+  const modeFromUrl = params.get('mode') === '2v2' ? '2v2' : '1v1';
   if (codeFromUrl) {
     roomCode = codeFromUrl;
+    selectedMode = modeFromUrl;
     enterLobby();
     return;
   }
+  $('mode1v1Btn').onclick = () => { selectedMode = '1v1'; $('mode1v1Btn').classList.add('sel'); $('mode2v2Btn').classList.remove('sel'); };
+  $('mode2v2Btn').onclick = () => { selectedMode = '2v2'; $('mode2v2Btn').classList.add('sel'); $('mode1v1Btn').classList.remove('sel'); };
   $('createRoomBtn').onclick = () => {
     const code = genCode(4);
     location.href = roomUrl(code); // 새 방 코드로 이동 → 위 분기에서 자동 접속
@@ -419,8 +452,8 @@ function enterLobby() {
   $('lobbyScreen').classList.add('on');
   $('roomCodeText').textContent = roomCode;
   $('copyLinkBtn').onclick = () => {
-    navigator.clipboard.writeText(roomUrl(roomCode)).then(
-      () => toast('링크를 복사했어요! 친구에게 붙여넣기 해주세요 📋'),
+    navigator.clipboard.writeText(roomUrl(roomCode, mode)).then(
+      () => toast('링크를 복사했어요! 함께할 사람에게 붙여넣기 해주세요 📋'),
       () => toast('복사 실패. 주소창의 링크를 직접 공유해주세요.')
     );
   };
@@ -429,7 +462,7 @@ function enterLobby() {
 
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
-  ws = new WebSocket(proto + location.host + '?room=' + encodeURIComponent(roomCode));
+  ws = new WebSocket(proto + location.host + '?room=' + encodeURIComponent(roomCode) + '&mode=' + selectedMode);
   ws.onmessage = (e) => handleMsg(JSON.parse(e.data));
   ws.onclose = () => { toast('서버 연결이 끊어졌습니다. 새로고침 해주세요.', 8000); };
 }
@@ -437,15 +470,14 @@ function send(msg) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg))
 
 function handleMsg(m) {
   switch (m.type) {
-    case 'full': toast('이 방은 이미 2명이 꽉 찼습니다. 다른 방 코드를 사용해주세요.', 8000); backToLanding(); break;
+    case 'full': toast('이 방은 이미 정원이 꽉 찼습니다. 다른 방 코드를 사용해주세요.', 8000); backToLanding(); break;
     case 'badRoom': toast('방 코드가 올바르지 않습니다.', 6000); backToLanding(); break;
     case 'joined':
-      myId = m.playerId;
-      $('myBadge').textContent = 'P' + myId;
-      $('myBadge').className = 'badge p' + myId;
+      myId = m.playerId; mode = m.mode; numPlayers = m.numPlayers; myTeam = m.team;
+      $('modeTag').textContent = mode === '2v2' ? '2:2 팀전' : '1:1 대전';
       $('mapHint').textContent = myId === 1 ? '(당신이 선택합니다)' : '(P1이 선택합니다)';
       break;
-    case 'lobby': lobby = m.lobby; renderLobby(m.connected); break;
+    case 'lobby': lobby = m.lobby; mode = m.mode; numPlayers = m.numPlayers; renderLobby(m.connected); break;
     case 'start': startGame(m); break;
     case 'move': if (G && m.from !== myId) netMove(m.x); break;
     case 'aim':  if (G && m.from !== myId) netAim(m); break;
@@ -453,7 +485,7 @@ function handleMsg(m) {
     case 'turn': onTurn(m); break;
     case 'gameover': onGameOver(m.winner); break;
     case 'opponentLeft':
-      if (G) { toast('상대가 나갔습니다.', 5000); showLobby(); }
+      if (G) { toast('다른 플레이어가 나가서 게임이 중단되었습니다.', 5000); showLobby(); }
       break;
   }
 }
@@ -487,6 +519,7 @@ function buildLobby() {
 
   $('readyBtn').onclick = () => { send({ type: 'ready' }); $('readyBtn').disabled = true; };
   $('rematchBtn').onclick = () => { send({ type: 'rematch' }); showLobby(); };
+  $('muteBtn').onclick = toggleMute;
 }
 
 function drawTankIcon(cv, tk) {
@@ -513,20 +546,20 @@ function drawMapThumb(cv, mapId) {
 }
 
 function renderLobby(connected) {
-  // 탱크 카드 표시
+  // 탱크 카드 표시 (픽 태그를 인원수만큼 동적으로)
   TANKS.forEach((tk) => {
     const card = $('tk' + tk.id);
-    card.classList.toggle('me',  lobby.picks[myId - 1] === tk.id);
-    card.classList.toggle('foe', lobby.picks[2 - myId] === tk.id);
+    card.classList.toggle('me', lobby.picks[myId - 1] === tk.id);
     card.querySelectorAll('.pick-tag').forEach(el => el.remove());
-    [0, 1].forEach(slot => {
+    for (let slot = 0; slot < numPlayers; slot++) {
       if (lobby.picks[slot] === tk.id) {
+        const team = slot < numPlayers / 2 ? 1 : 2;
         const tag = document.createElement('div');
-        tag.className = 'pick-tag t' + (slot + 1);
+        tag.className = 'pick-tag t' + team;
         tag.textContent = 'P' + (slot + 1);
         card.appendChild(tag);
       }
-    });
+    }
   });
   // 맵 카드
   MAPS.forEach((mp) => {
@@ -534,27 +567,31 @@ function renderLobby(connected) {
     card.classList.toggle('sel', lobby.map === mp.id);
     card.classList.toggle('locked', myId !== 1);
   });
-  // 상대 상태
-  const foeSlot = 2 - myId; // 상대 인덱스(0-based)
-  const foeOn = connected && connected[foeSlot];
-  const fb = $('foeBadge');
-  if (foeOn) {
-    fb.textContent = 'P' + (foeSlot + 1) + (lobby.ready[foeSlot] ? ' 준비완료!' : ' 접속함');
-    fb.className = 'badge p' + (foeSlot + 1);
-  } else {
-    fb.textContent = '대기 중'; fb.className = 'badge wait';
+
+  // 플레이어 목록 (팀 색상 + 접속/준비 상태)
+  const list = $('playerList');
+  list.innerHTML = '';
+  for (let slot = 0; slot < numPlayers; slot++) {
+    const team = slot < numPlayers / 2 ? 1 : 2;
+    const on = connected && connected[slot];
+    const ready = lobby.ready[slot];
+    const chip = document.createElement('div');
+    chip.className = `player-chip team${team}` + (ready ? ' ready' : '') + (slot === myId - 1 ? ' me' : '');
+    const teamTxt = numPlayers > 2 ? (team === 1 ? ' · 팀A' : ' · 팀B') : '';
+    chip.innerHTML = `<span class="pname">P${slot + 1}${teamTxt}${slot === myId - 1 ? ' (나)' : ''}</span>
+      <span class="pstate">${!on ? '대기 중' : (ready ? '준비완료!' : '접속함')}</span>`;
+    list.appendChild(chip);
   }
-  $('lobbyMsg').textContent = foeOn
-    ? (lobby.ready[foeSlot] ? '상대가 준비를 마쳤습니다!' : '탱크를 고르고 준비 버튼을 누르세요')
-    : '상대를 기다리는 중... (다른 컴퓨터에서 접속)';
+
   // 준비 버튼
   const iPicked = lobby.picks[myId - 1] != null;
   $('readyBtn').disabled = !iPicked || lobby.ready[myId - 1];
-  $('readyBtn').textContent = lobby.ready[myId - 1] ? '상대 기다리는 중...' : '준비 완료!';
+  $('readyBtn').textContent = lobby.ready[myId - 1] ? '다른 플레이어 기다리는 중...' : '준비 완료!';
 }
 
 function showLobby() {
   G = null;
+  stopBgm();
   $('overOverlay').classList.remove('on');
   $('gameScreen').classList.remove('on');
   $('lobbyScreen').classList.add('on');
@@ -562,6 +599,7 @@ function showLobby() {
 
 // 방이 가득 찼거나 잘못된 코드일 때 랜딩 화면으로 되돌리기
 function backToLanding() {
+  stopBgm();
   $('lobbyScreen').classList.remove('on');
   $('gameScreen').classList.remove('on');
   $('landingScreen').classList.add('on');
@@ -579,15 +617,21 @@ const TANK_R = 13;            // 탱크 히트 반경
 
 function startGame(m) {
   const terrain = genTerrain(m.map, m.seed);
-  const spawnX = [Math.floor(W * 0.11), Math.floor(W * 0.89)];
+  const n = m.tanks.length;
+  const half = n / 2;
+  // 2인: 좌우 끝 스폰 / 4인: 팀별로 좌측 2대, 우측 2대가 나란히 스폰
+  const spawnRatios = n === 4 ? [0.08, 0.22, 0.78, 0.92] : [0.11, 0.89];
+  const spawnX = spawnRatios.map((r) => Math.floor(W * r));
   G = {
     map: m.map, terrain,
-    wind: m.wind, turn: m.turn, phase: 'aim',
-    tanks: [0, 1].map((i) => ({
+    wind: m.wind, turn: m.turn, turnOrder: m.turnOrder, phase: 'aim',
+    numPlayers: n,
+    tanks: Array.from({ length: n }, (_, i) => ({
       def: TANKS[m.tanks[i]],
       x: spawnX[i], y: terrain[spawnX[i]],
       hp: 100, alive: true,
-      angle: i === 0 ? 60 : 120,
+      team: i < half ? 1 : 2,
+      angle: i < half ? 60 : 120,
       weapon: 0, fuel: TANKS[m.tanks[i]].move,
       vy: 0, fallFrom: null,
     })),
@@ -599,7 +643,28 @@ function startGame(m) {
   buildWeaponBtns();
   $('lobbyScreen').classList.remove('on');
   $('gameScreen').classList.add('on');
-  toast(G.turn === myId ? '당신의 턴! 🎯' : '상대의 턴입니다');
+  toast(G.turn === myId ? '당신의 턴! 🎯' : (mode === '2v2' ? '다른 팀의 턴입니다' : '상대의 턴입니다'));
+  playBgm(m.map);
+}
+
+// 팀 전멸 여부와 승자를 계산 (1v1도 "팀 1명"으로 취급해 동일 로직 사용)
+function teamStatus() {
+  const half = G.tanks.length / 2;
+  const team1Alive = G.tanks.slice(0, half).some((t) => t.alive);
+  const team2Alive = G.tanks.slice(half).some((t) => t.alive);
+  return { team1Alive, team2Alive };
+}
+
+// 다음 턴 플레이어(1-based)를 턴 순서상에서 찾되, 전멸하지 않은 팀 안에서 살아있는 사람만 대상
+function computeNextTurn() {
+  const order = G.turnOrder;
+  let idx = order.indexOf(G.turn);
+  for (let step = 1; step <= order.length; step++) {
+    idx = (idx + 1) % order.length;
+    const cand = order[idx];
+    if (G.tanks[cand - 1].alive) return cand;
+  }
+  return G.turn; // 안전장치 (도달하면 안 됨)
 }
 
 const me   = () => G.tanks[myId - 1];
@@ -786,12 +851,13 @@ function checkResolve() {
   G.phase = 'settle';
   if (G.turn === myId) { // 내가 쏜 턴 → 내가 결과 확정
     setTimeout(() => {
-      const dead = G.tanks.findIndex(t => !t.alive);
-      if (dead !== -1) {
-        const winner = G.tanks[0].alive === G.tanks[1].alive ? 0 : (G.tanks[0].alive ? 1 : 2);
+      const { team1Alive, team2Alive } = teamStatus();
+      if (!team1Alive || !team2Alive) {
+        const winner = team1Alive === team2Alive ? 0 : (team1Alive ? 1 : 2);
         send({ type: 'gameover', winner });
       } else {
-        send({ type: 'turnDone', sync: { hp: G.tanks.map(t => t.hp), x: G.tanks.map(t => t.x), alive: G.tanks.map(t => t.alive) } });
+        const nextTurn = computeNextTurn();
+        send({ type: 'turnDone', nextTurn, sync: { hp: G.tanks.map(t => t.hp), x: G.tanks.map(t => t.x), alive: G.tanks.map(t => t.alive) } });
       }
     }, 500);
   }
@@ -810,15 +876,17 @@ function onTurn(m) {
   G.power = 0; G.charging = false;
   const t = activeTank();
   t.fuel = t.def.move;
-  toast(G.turn === myId ? '당신의 턴! 🎯 (바람을 확인하세요)' : '상대의 턴입니다');
+  const myTurn = G.turn === myId;
+  toast(myTurn ? '당신의 턴! 🎯 (바람을 확인하세요)' : (mode === '2v2' && t.team === myTeam ? '팀원의 턴입니다' : '상대의 턴입니다'));
 }
 
 function onGameOver(winner) {
   if (!G) return;
   G.phase = 'over';
-  const txt = winner === 0 ? '무승부!' : (winner === myId ? '🏆 승리!' : '패배...');
+  stopBgm();
+  const txt = winner === 0 ? '무승부!' : (winner === myTeam ? '🏆 승리!' : '패배...');
   $('overText').textContent = txt;
-  $('overText').style.color = winner === myId ? 'var(--accent)' : '#aab';
+  $('overText').style.color = winner === myTeam ? 'var(--accent)' : '#aab';
   $('overOverlay').classList.add('on');
 }
 </script>
@@ -954,6 +1022,11 @@ function drawTank(t, i) {
   ctx.fillStyle = '#fff'; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 3;
   const label = `P${i + 1} ${t.def.name}`;
   ctx.strokeText(label, t.x, t.y - 44); ctx.fillText(label, t.x, t.y - 44);
+  // 2v2일 때 팀 색상 표시줄 (라벨 위쪽)
+  if (G.numPlayers > 2) {
+    ctx.fillStyle = t.team === 1 ? '#4cd964' : '#ff9f43';
+    roundRect(t.x - 14, t.y - 55, 28, 4, 2);
+  }
   ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(t.x - 24, t.y - 40, 48, 7);
   ctx.fillStyle = t.hp > 40 ? '#4cd964' : (t.hp > 15 ? '#ffd93d' : '#ff5252');
   ctx.fillRect(t.x - 24, t.y - 40, 48 * t.hp / 100, 7);
@@ -1006,7 +1079,28 @@ function drawTopUI() {
   ctx.font = 'bold 17px sans-serif';
   ctx.fillStyle = G.turn === myId ? '#ffd93d' : '#aab4d8';
   ctx.textAlign = 'left';
-  ctx.fillText(G.phase === 'over' ? '게임 종료' : (G.turn === myId ? '▶ 내 턴' : '상대 턴...'), 20, 34);
+  const turnTxt = G.phase === 'over' ? '게임 종료'
+    : (G.turn === myId ? '▶ 내 턴' : (mode === '2v2' && G.tanks[G.turn - 1].team === myTeam ? '팀원 턴...' : '상대 턴...'));
+  ctx.fillText(turnTxt, 20, 34);
+
+  // ── 팀 합산 HP 바 (2v2 전용) ──
+  if (G.numPlayers > 2) {
+    const half = G.tanks.length / 2;
+    const team1HP = G.tanks.slice(0, half).reduce((s, t) => s + Math.max(0, t.hp), 0);
+    const team2HP = G.tanks.slice(half).reduce((s, t) => s + Math.max(0, t.hp), 0);
+    const maxHP = half * 100;
+    const barW = 150, barH = 10;
+    // 팀A (좌상단, 초록)
+    ctx.textAlign = 'left'; ctx.font = 'bold 11px sans-serif'; ctx.fillStyle = '#4cd964';
+    ctx.fillText('팀A', 20, 58);
+    ctx.fillStyle = 'rgba(255,255,255,.15)'; ctx.fillRect(52, 50, barW, barH);
+    ctx.fillStyle = '#4cd964'; ctx.fillRect(52, 50, barW * team1HP / maxHP, barH);
+    // 팀B (우상단, 주황) - 오른쪽 정렬
+    ctx.textAlign = 'right'; ctx.fillStyle = '#ff9f43';
+    ctx.fillText('팀B', W - 20, 58);
+    ctx.fillStyle = 'rgba(255,255,255,.15)'; ctx.fillRect(W - 52 - barW, 50, barW, barH);
+    ctx.fillStyle = '#ff9f43'; ctx.fillRect(W - 52 - barW, 50, barW * team2HP / maxHP, barH);
+  }
 
   // ── 내 상태 패널 (좌하단) ──
   const t = me();
@@ -1026,15 +1120,120 @@ function drawTopUI() {
 }
 
 /* ═══════════════════════════════════════════════
+   배경음악 (WebAudio 8비트 시퀀서 - 외부 파일 없이 직접 합성)
+   ═══════════════════════════════════════════════ */
+const NOTE_FREQ = (() => {
+  const table = {}, names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  for (let oct = 1; oct <= 6; oct++) {
+    names.forEach((n, i) => {
+      const semis = (oct - 4) * 12 + (i - 9); // A4 = 440
+      table[n + oct] = 440 * Math.pow(2, semis / 12);
+    });
+  }
+  return table;
+})();
+
+// 맵마다 리드(사각파)+베이스(삼각파) 8비트 루프. d = 박자 길이(1=한 박)
+const BGM_TRACKS = [
+  { // 0 초원 언덕: 밝고 통통 튀는 메이저 멜로디
+    tempo: 150, lead: [
+      ['C5',0.5],['E5',0.5],['G5',0.5],['E5',0.5], ['C5',0.5],['E5',0.5],['G5',0.5],['E5',0.5],
+      ['D5',0.5],['F5',0.5],['A5',0.5],['F5',0.5], ['D5',0.5],['F5',0.5],['A5',0.5],['G5',0.5],
+    ],
+    bass: [['C3',2],['G2',2],['A2',2],['F2',2]],
+  },
+  { // 1 험준한 산맥: 씩씩한 모험풍, 살짝 낮은 마이너 펜타
+    tempo: 132, lead: [
+      ['A4',0.5],['C5',0.5],['D5',0.5],['E5',0.5], ['G5',1],[null,0.5],['E5',0.5],
+      ['A4',0.5],['C5',0.5],['D5',0.5],['E5',0.5], ['C5',1],[null,0.5],['A4',0.5],
+    ],
+    bass: [['A2',2],['F2',2],['G2',2],['E2',2]],
+  },
+  { // 2 깊은 계곡(야경): 신비롭고 느린 마이너
+    tempo: 100, lead: [
+      ['E4',1],['G4',0.5],['A4',0.5], ['B4',1.5],[null,0.5],
+      ['D5',1],['C5',0.5],['B4',0.5], ['A4',2],
+    ],
+    bass: [['E2',4],['C2',4]],
+  },
+  { // 3 사막 협곡: 이국적인 프리지안 스케일, 스타카토
+    tempo: 138, lead: [
+      ['D4',0.5],['D#4',0.5],['F4',0.5],['G4',0.5], ['A4',0.5],['G4',0.5],['F4',0.5],['D#4',0.5],
+      ['D4',0.5],['F4',0.5],['A4',0.5],['C5',0.5], ['A4',0.5],['F4',0.5],['D4',1],
+    ],
+    bass: [['D2',2],['A#1',2],['C2',2],['A1',2]],
+  },
+];
+
+let AC = null;
+let bgmMuted = false;
+let bgmGain = null;
+let bgmStopFlag = { stop: true };
+let bgmTimeoutId = null;
+
+function ensureAC() {
+  AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+  if (!bgmGain) { bgmGain = AC.createGain(); bgmGain.gain.value = bgmMuted ? 0 : 0.16; bgmGain.connect(AC.destination); }
+  if (AC.state === 'suspended') AC.resume();
+  return AC;
+}
+
+function playNote(ac, freq, startAt, dur, type, gainVal) {
+  if (!freq) return; // 쉼표
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.value = freq;
+  o.connect(g); g.connect(bgmGain);
+  g.gain.setValueAtTime(0.0001, startAt);
+  g.gain.exponentialRampToValueAtTime(gainVal, startAt + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, startAt + dur * 0.92);
+  o.start(startAt); o.stop(startAt + dur);
+}
+
+function scheduleBgmLoop(mapId, myFlag) {
+  if (myFlag.stop) return;
+  const ac = ensureAC();
+  const track = BGM_TRACKS[mapId];
+  const beat = 60 / track.tempo;
+  const start = ac.currentTime + 0.05;
+
+  let t = start;
+  track.lead.forEach(([note, d]) => { playNote(ac, NOTE_FREQ[note], t, beat * d, 'square', 0.11); t += beat * d; });
+  const leadDur = t - start;
+
+  let tb = start;
+  track.bass.forEach(([note, d]) => { playNote(ac, NOTE_FREQ[note], tb, beat * d * 0.95, 'triangle', 0.16); tb += beat * d; });
+
+  const loopDur = Math.max(leadDur, tb - start);
+  bgmTimeoutId = setTimeout(() => scheduleBgmLoop(mapId, myFlag), loopDur * 1000);
+}
+
+function playBgm(mapId) {
+  stopBgm();
+  const flag = { stop: false };
+  bgmStopFlag = flag;
+  try { scheduleBgmLoop(mapId, flag); } catch (e) { /* 오디오 실패해도 게임은 계속 */ }
+}
+
+function stopBgm() {
+  bgmStopFlag.stop = true;
+  if (bgmTimeoutId) clearTimeout(bgmTimeoutId);
+}
+
+function toggleMute() {
+  bgmMuted = !bgmMuted;
+  if (bgmGain) bgmGain.gain.value = bgmMuted ? 0 : 0.16;
+  $('muteBtn').textContent = bgmMuted ? '🔇' : '🔊';
+}
+
+/* ═══════════════════════════════════════════════
    효과음 (WebAudio 간단 합성)
    ═══════════════════════════════════════════════ */
-let AC = null;
 function sfx(kind) {
   try {
-    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
-    const o = AC.createOscillator(), g = AC.createGain();
-    o.connect(g); g.connect(AC.destination);
-    const now = AC.currentTime;
+    const ac = ensureAC();
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.connect(g); g.connect(ac.destination);
+    const now = ac.currentTime;
     if (kind === 'fire') {
       o.type = 'square'; o.frequency.setValueAtTime(420, now);
       o.frequency.exponentialRampToValueAtTime(90, now + 0.18);
