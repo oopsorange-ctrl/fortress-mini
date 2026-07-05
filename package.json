@@ -1,0 +1,19 @@
+{
+  "name": "fortress",
+  "version": "1.0.0",
+  "description": "포트리스 미니 - 2인용 탱크 포격 게임",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ws": "^8.21.0"
+  }
+}

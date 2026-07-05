@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>포트리스 미니</title>
+<style>
+  :root {
+    --bg: #10142a;
+    --panel: #1b2140;
+    --panel2: #242c55;
+    --line: #3a4478;
+    --text: #e8ecff;
+    --dim: #8f9ac4;
+    --p1: #4cd964;
+    --p2: #ff9f43;
+    --accent: #ffd93d;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+    padding: 16px; user-select: none;
+  }
+  h1 { font-size: 26px; letter-spacing: 6px; margin: 8px 0 2px; color: var(--accent); text-shadow: 0 3px 0 #7a5a00; }
+  .sub { color: var(--dim); font-size: 13px; margin-bottom: 14px; letter-spacing: 2px; }
+
+  /* ── 화면 전환 ── */
+  .screen { display: none; width: 100%; max-width: 1080px; }
+  .screen.on { display: block; }
+
+  /* ── 로비 ── */
+  .status-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--panel); border: 2px solid var(--line); border-radius: 10px;
+    padding: 10px 16px; margin-bottom: 14px; font-size: 14px;
+  }
+  .badge { padding: 3px 10px; border-radius: 20px; font-weight: bold; font-size: 13px; }
+  .badge.p1 { background: var(--p1); color: #04310e; }
+  .badge.p2 { background: var(--p2); color: #4a2600; }
+  .badge.wait { background: var(--panel2); color: var(--dim); border: 1px dashed var(--line); }
+
+  .section-title { font-size: 14px; color: var(--dim); margin: 14px 0 8px; letter-spacing: 2px; }
+  .tank-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .tank-card {
+    background: var(--panel); border: 2px solid var(--line); border-radius: 12px;
+    padding: 12px; cursor: pointer; transition: transform .08s, border-color .08s;
+    position: relative;
+  }
+  .tank-card:hover { transform: translateY(-3px); border-color: var(--dim); }
+  .tank-card.me { border-color: var(--p1); box-shadow: 0 0 0 2px var(--p1) inset; }
+  .tank-card.foe { border-color: var(--p2); box-shadow: 0 0 0 2px var(--p2) inset; }
+  .tank-card.me.foe { box-shadow: 0 0 0 2px var(--p1) inset, 0 0 12px var(--p2); }
+  .tank-card canvas { display: block; margin: 0 auto 8px; image-rendering: pixelated; }
+  .tank-name { font-weight: 800; font-size: 15px; text-align: center; margin-bottom: 6px; }
+  .tank-desc { font-size: 12px; color: var(--dim); line-height: 1.5; }
+  .tank-desc b { color: var(--text); }
+  .pick-tag { position: absolute; top: -9px; font-size: 11px; font-weight: bold; padding: 2px 8px; border-radius: 10px; }
+  .pick-tag.t1 { left: 8px; background: var(--p1); color: #04310e; }
+  .pick-tag.t2 { right: 8px; background: var(--p2); color: #4a2600; }
+
+  .map-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .map-card {
+    background: var(--panel); border: 2px solid var(--line); border-radius: 12px;
+    padding: 8px; cursor: pointer; text-align: center;
+  }
+  .map-card.sel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+  .map-card.locked { cursor: default; opacity: .85; }
+  .map-card canvas { width: 100%; border-radius: 6px; display: block; margin-bottom: 6px; }
+  .map-name { font-size: 13px; font-weight: 700; }
+
+  .lobby-bottom { display: flex; gap: 12px; align-items: center; margin-top: 18px; }
+  button.big {
+    flex: 1; padding: 14px; font-size: 17px; font-weight: 800; letter-spacing: 3px;
+    background: var(--accent); color: #4a3800; border: 0; border-radius: 12px; cursor: pointer;
+    box-shadow: 0 4px 0 #8a6d00;
+  }
+  button.big:disabled { background: var(--panel2); color: var(--dim); box-shadow: none; cursor: default; }
+  button.big:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 #8a6d00; }
+  .hint { font-size: 12px; color: var(--dim); }
+
+  /* ── 게임 ── */
+  #gameWrap { position: relative; width: 100%; }
+  #game { width: 100%; display: block; border-radius: 12px; border: 3px solid var(--line); background: #000; }
+  #hud {
+    display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; flex-wrap: wrap;
+  }
+  .hud-box { background: var(--panel); border: 2px solid var(--line); border-radius: 10px; padding: 8px 12px; font-size: 13px; }
+  .weapon-btns { display: flex; gap: 8px; }
+  .wbtn {
+    background: var(--panel2); border: 2px solid var(--line); border-radius: 10px;
+    color: var(--text); padding: 8px 12px; cursor: pointer; font-size: 13px; text-align: left; min-width: 180px;
+  }
+  .wbtn.sel { border-color: var(--accent); background: #33350f; }
+  .wbtn small { display: block; color: var(--dim); font-size: 11px; margin-top: 2px; }
+  .keys { font-size: 12px; color: var(--dim); line-height: 1.7; }
+  .keys kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; font-size: 11px; }
+
+  /* ── 오버레이 ── */
+  .overlay {
+    position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(10, 12, 30, .75); border-radius: 12px; flex-direction: column; gap: 16px; z-index: 5;
+  }
+  .overlay.on { display: flex; }
+  .overlay h2 { font-size: 34px; letter-spacing: 4px; text-shadow: 0 3px 0 rgba(0,0,0,.5); }
+  .overlay button { padding: 12px 32px; font-size: 16px; font-weight: 800; border: 0; border-radius: 10px; background: var(--accent); color: #4a3800; cursor: pointer; }
+
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--panel2); border: 2px solid var(--line); border-radius: 10px;
+    padding: 10px 20px; font-size: 14px; display: none; z-index: 20;
+  }
+
+  /* ── 방 만들기/입장 화면 ── */
+  .landing-box {
+    background: var(--panel); border: 2px solid var(--line); border-radius: 14px;
+    padding: 28px; display: flex; flex-direction: column; gap: 20px;
+  }
+  .landing-option { display: flex; flex-direction: column; gap: 10px; }
+  .landing-option h3 { font-size: 15px; color: var(--dim); letter-spacing: 1px; }
+  .landing-row { display: flex; gap: 8px; }
+  .landing-row input {
+    flex: 1; background: var(--panel2); border: 2px solid var(--line); border-radius: 10px;
+    color: var(--text); padding: 12px 14px; font-size: 18px; letter-spacing: 4px; text-align: center;
+    text-transform: uppercase; font-weight: 800;
+  }
+  .landing-row input:focus { outline: none; border-color: var(--accent); }
+  .landing-btn {
+    padding: 12px 22px; font-size: 15px; font-weight: 800; border: 0; border-radius: 10px;
+    background: var(--accent); color: #4a3800; cursor: pointer; white-space: nowrap;
+    box-shadow: 0 4px 0 #8a6d00;
+  }
+  .landing-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #8a6d00; }
+  .landing-btn.ghost { background: var(--panel2); color: var(--text); box-shadow: none; border: 2px solid var(--line); }
+  .divider { text-align: center; color: var(--dim); font-size: 12px; letter-spacing: 2px; position: relative; }
+
+  /* ── 로비 내 방 코드 박스 ── */
+  .room-box {
+    display: flex; align-items: center; gap: 10px; background: var(--panel2);
+    border: 2px dashed var(--line); border-radius: 10px; padding: 8px 14px; margin-bottom: 14px;
+  }
+  .room-box .code { font-size: 20px; font-weight: 800; letter-spacing: 5px; color: var(--accent); }
+  .room-box .copy-btn {
+    margin-left: auto; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--text); cursor: pointer; font-size: 12px;
+  }
+</style>
+</head>
+<body>
+
+<h1>포트리스 미니</h1>
+<div class="sub">TANK ARTILLERY · 2 PLAYERS · LAN</div>
+
+<!-- ═══════════ 방 만들기/입장 화면 ═══════════ -->
+<div id="landingScreen" class="screen on" style="max-width:420px;">
+  <div class="landing-box">
+    <div class="landing-option">
+      <h3>■ 새 방 만들기</h3>
+      <button class="landing-btn" id="createRoomBtn" style="width:100%;">방 만들고 링크 공유하기</button>
+    </div>
+    <div class="divider">또는</div>
+    <div class="landing-option">
+      <h3>■ 방 코드로 입장</h3>
+      <div class="landing-row">
+        <input id="joinCodeInput" placeholder="ABCD" maxlength="8" autocomplete="off">
+        <button class="landing-btn ghost" id="joinRoomBtn">입장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 로비 화면 ═══════════ -->
+<div id="lobbyScreen" class="screen">
+  <div class="room-box">
+    <span>방 코드</span> <span class="code" id="roomCodeText">----</span>
+    <button class="copy-btn" id="copyLinkBtn">🔗 링크 복사</button>
+  </div>
+  <div class="status-bar">
+    <div>나: <span id="myBadge" class="badge wait">접속 중...</span></div>
+    <div id="lobbyMsg" class="hint">상대를 기다리는 중...</div>
+    <div>상대: <span id="foeBadge" class="badge wait">대기 중</span></div>
+  </div>
+
+  <div class="section-title">■ 탱크 선택 (클릭)</div>
+  <div class="tank-grid" id="tankGrid"></div>
+
+  <div class="section-title">■ 맵 선택 <span id="mapHint" class="hint">(P1이 선택합니다)</span></div>
+  <div class="map-grid" id="mapGrid"></div>
+
+  <div class="lobby-bottom">
+    <button class="big" id="readyBtn" disabled>준비 완료!</button>
+  </div>
+</div>
+
+<!-- ═══════════ 게임 화면 ═══════════ -->
+<div id="gameScreen" class="screen">
+  <div id="gameWrap">
+    <canvas id="game" width="1280" height="640"></canvas>
+    <div class="overlay" id="overOverlay">
+      <h2 id="overText">승리!</h2>
+      <button id="rematchBtn">로비로 돌아가기</button>
+    </div>
+  </div>
+  <div id="hud">
+    <div class="hud-box">
+      <div class="weapon-btns">
+        <button class="wbtn" id="w0btn"></button>
+        <button class="wbtn" id="w1btn"></button>
+      </div>
+    </div>
+    <div class="hud-box keys">
+      <kbd>A</kbd><kbd>D</kbd> 이동 &nbsp; <kbd>←</kbd><kbd>→</kbd> 각도 &nbsp;
+      <kbd>1</kbd><kbd>2</kbd> 무기 &nbsp; <kbd>SPACE</kbd> 누르고 있다가 떼면 발사!
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   데이터 정의: 탱크 4종 & 맵 4종
+   ═══════════════════════════════════════════════ */
+
+// 무기 공통 규칙:
+//  - weapon 0 (일반탄): 폭발 범위 넓음, 파워 보통
+//  - weapon 1 (강력탄): 폭발 범위 좁음, 파워 강력
+const TANKS = [
+  {
+    id: 0, name: '발칸', color: '#4cd964', dark: '#1f7a35',
+    move: 110, gravMul: 1.0,
+    desc: '균형형. 다루기 쉬운 표준 전차.',
+    weapons: [
+      { name: '표준 포탄',  info: '넓은 폭발 · 보통 위력', radius: 46, dmg: 30, kind: 'normal' },
+      { name: '집속 철갑탄', info: '좁은 폭발 · 강력한 위력', radius: 21, dmg: 55, kind: 'normal' },
+    ],
+  },
+  {
+    id: 1, name: '레인버드', color: '#54a0ff', dark: '#1e5aa8',
+    move: 100, gravMul: 1.0,
+    desc: '분열형. 일반탄이 공중에서 3발로 갈라진다.',
+    weapons: [
+      { name: '트리플 레인', info: '정점에서 3발 분열 · 광범위', radius: 30, dmg: 15, kind: 'split' },
+      { name: '드릴 슛',    info: '빠르고 좁고 아프다', radius: 16, dmg: 62, kind: 'fast' },
+    ],
+  },
+  {
+    id: 2, name: '매머드', color: '#ff6b6b', dark: '#a83232',
+    move: 70, gravMul: 1.3,
+    desc: '중전차. 느리고 포탄이 무겁지만 한 방이 크다.',
+    weapons: [
+      { name: '대구경 유탄', info: '아주 넓은 폭발 · 지형 대파괴', radius: 58, dmg: 28, kind: 'normal' },
+      { name: '벙커버스터', info: '좁지만 최강의 한 방', radius: 25, dmg: 68, kind: 'normal' },
+    ],
+  },
+  {
+    id: 3, name: '트윈스', color: '#feca57', dark: '#b3860f',
+    move: 120, gravMul: 1.0,
+    desc: '연사형. 모든 포탄을 2연발로 쏜다.',
+    weapons: [
+      { name: '더블 캐넌',  info: '2연발 · 넓은 폭발', radius: 34, dmg: 16, kind: 'twin' },
+      { name: '더블 스나이프', info: '2연발 · 좁고 강력', radius: 15, dmg: 30, kind: 'twin' },
+    ],
+  },
+];
+
+const MAPS = [
+  { id: 0, name: '초원 언덕',   sky: ['#7ec8ff', '#cfeaff'], ground: '#5aa832', dirt: '#6b4a2b', kind: 'hills' },
+  { id: 1, name: '험준한 산맥', sky: ['#ff9a5c', '#ffd3a1'], ground: '#8a7a6a', dirt: '#5c5148', kind: 'mountain' },
+  { id: 2, name: '깊은 계곡',   sky: ['#0d1440', '#33406e'], ground: '#5a6b8a', dirt: '#3a4358', kind: 'valley' },
+  { id: 3, name: '사막 협곡',   sky: ['#ffd98a', '#ffefc4'], ground: '#e0b56a', dirt: '#a87c3f', kind: 'dunes' },
+];
+
+/* ═══════════════════════════════════════════════
+   지형 생성 (시드 기반 → 두 컴퓨터에서 동일)
+   ═══════════════════════════════════════════════ */
+const W = 1280, H = 640;
+
+function mulberry32(seed) {
+  return function () {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function genTerrain(mapId, seed) {
+  const rnd = mulberry32(seed + mapId * 7919);
+  const t = new Float64Array(W);
+  const base = H * 0.72;
+
+  if (mapId === 0) { // 초원 언덕: 완만한 파도
+    const p1 = rnd() * 6.28, p2 = rnd() * 6.28, p3 = rnd() * 6.28;
+    for (let x = 0; x < W; x++) {
+      t[x] = base
+        + Math.sin(x * 0.006 + p1) * 55
+        + Math.sin(x * 0.013 + p2) * 28
+        + Math.sin(x * 0.031 + p3) * 10;
+    }
+  } else if (mapId === 1) { // 험준한 산맥: 가운데 거대한 산
+    const peakX = W * (0.42 + rnd() * 0.16);
+    const peakH = 300 + rnd() * 60;
+    const p = rnd() * 6.28;
+    for (let x = 0; x < W; x++) {
+      const d = Math.abs(x - peakX);
+      const mountain = Math.max(0, peakH - d * 0.62);
+      t[x] = base - mountain + Math.sin(x * 0.02 + p) * 22 + Math.sin(x * 0.055) * 9;
+    }
+  } else if (mapId === 2) { // 깊은 계곡: 양쪽 절벽 + 깊은 골짜기
+    const vX = W * (0.44 + rnd() * 0.12);
+    const p = rnd() * 6.28;
+    for (let x = 0; x < W; x++) {
+      const d = Math.abs(x - vX);
+      const cliff = Math.min(1, d / (W * 0.34));      // 0(계곡 중심) → 1(가장자리)
+      const y = (H * 0.86) - cliff * cliff * 330;     // 가장자리가 높음
+      t[x] = y + Math.sin(x * 0.025 + p) * 16;
+    }
+  } else { // 사막 협곡: 뾰족한 듄 여러 개
+    const p1 = rnd() * 6.28, p2 = rnd() * 6.28;
+    for (let x = 0; x < W; x++) {
+      const dune = Math.abs(Math.sin(x * 0.008 + p1)) * 150; // 뾰족뾰족
+      t[x] = base + 20 - dune + Math.sin(x * 0.04 + p2) * 12;
+    }
+  }
+  // 화면 밖으로 나가지 않게
+  for (let x = 0; x < W; x++) t[x] = Math.max(80, Math.min(H - 40, t[x]));
+  return t;
+}
+</script>
+<script>
+/* ═══════════════════════════════════════════════
+   네트워크 & 로비
+   ═══════════════════════════════════════════════ */
+let ws, myId = 0, roomCode = '', lobby = { picks: [null, null], ready: [false, false], map: 0 };
+let G = null; // 게임 상태
+
+const $ = (id) => document.getElementById(id);
+function toast(msg, ms = 2500) {
+  const t = $('toast'); t.textContent = msg; t.style.display = 'block';
+  clearTimeout(t._tm); t._tm = setTimeout(() => t.style.display = 'none', ms);
+}
+
+/* ── 방 코드 유틸 ── */
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 헷갈리는 0/O, 1/I 제외
+function genCode(len = 4) {
+  let s = '';
+  for (let i = 0; i < len; i++) s += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+  return s;
+}
+function roomUrl(code) {
+  return location.origin + location.pathname + '?room=' + code;
+}
+
+/* ── 랜딩 화면: URL에 방 코드가 있으면 바로 접속, 없으면 만들기/입장 화면 ── */
+function initLanding() {
+  const params = new URLSearchParams(location.search);
+  const codeFromUrl = (params.get('room') || '').toUpperCase().trim();
+  if (codeFromUrl) {
+    roomCode = codeFromUrl;
+    enterLobby();
+    return;
+  }
+  $('createRoomBtn').onclick = () => {
+    const code = genCode(4);
+    location.href = roomUrl(code); // 새 방 코드로 이동 → 위 분기에서 자동 접속
+  };
+  $('joinRoomBtn').onclick = () => {
+    const code = $('joinCodeInput').value.toUpperCase().trim();
+    if (!/^[A-Z0-9]{3,8}$/.test(code)) { toast('방 코드를 정확히 입력해주세요 (영문/숫자 3~8자)'); return; }
+    location.href = roomUrl(code);
+  };
+  $('joinCodeInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('joinRoomBtn').click(); });
+}
+
+function enterLobby() {
+  $('landingScreen').classList.remove('on');
+  $('lobbyScreen').classList.add('on');
+  $('roomCodeText').textContent = roomCode;
+  $('copyLinkBtn').onclick = () => {
+    navigator.clipboard.writeText(roomUrl(roomCode)).then(
+      () => toast('링크를 복사했어요! 친구에게 붙여넣기 해주세요 📋'),
+      () => toast('복사 실패. 주소창의 링크를 직접 공유해주세요.')
+    );
+  };
+  connect();
+}
+
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+  ws = new WebSocket(proto + location.host + '?room=' + encodeURIComponent(roomCode));
+  ws.onmessage = (e) => handleMsg(JSON.parse(e.data));
+  ws.onclose = () => { toast('서버 연결이 끊어졌습니다. 새로고침 해주세요.', 8000); };
+}
+function send(msg) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); }
+
+function handleMsg(m) {
+  switch (m.type) {
+    case 'full': toast('이 방은 이미 2명이 꽉 찼습니다. 다른 방 코드를 사용해주세요.', 8000); backToLanding(); break;
+    case 'badRoom': toast('방 코드가 올바르지 않습니다.', 6000); backToLanding(); break;
+    case 'joined':
+      myId = m.playerId;
+      $('myBadge').textContent = 'P' + myId;
+      $('myBadge').className = 'badge p' + myId;
+      $('mapHint').textContent = myId === 1 ? '(당신이 선택합니다)' : '(P1이 선택합니다)';
+      break;
+    case 'lobby': lobby = m.lobby; renderLobby(m.connected); break;
+    case 'start': startGame(m); break;
+    case 'move': if (G && m.from !== myId) netMove(m.x); break;
+    case 'aim':  if (G && m.from !== myId) netAim(m); break;
+    case 'fire': onFire(m); break;
+    case 'turn': onTurn(m); break;
+    case 'gameover': onGameOver(m.winner); break;
+    case 'opponentLeft':
+      if (G) { toast('상대가 나갔습니다.', 5000); showLobby(); }
+      break;
+  }
+}
+
+/* ── 로비 렌더링 ── */
+function buildLobby() {
+  const tg = $('tankGrid');
+  TANKS.forEach((tk) => {
+    const card = document.createElement('div');
+    card.className = 'tank-card'; card.id = 'tk' + tk.id;
+    card.innerHTML = `
+      <canvas width="90" height="54"></canvas>
+      <div class="tank-name" style="color:${tk.color}">${tk.name}</div>
+      <div class="tank-desc">${tk.desc}<br>
+        <b>일반:</b> ${tk.weapons[0].info}<br>
+        <b>강력:</b> ${tk.weapons[1].info}</div>`;
+    card.onclick = () => send({ type: 'pick', tank: tk.id });
+    tg.appendChild(card);
+    drawTankIcon(card.querySelector('canvas'), tk);
+  });
+
+  const mg = $('mapGrid');
+  MAPS.forEach((mp) => {
+    const card = document.createElement('div');
+    card.className = 'map-card'; card.id = 'mp' + mp.id;
+    card.innerHTML = `<canvas width="220" height="90"></canvas><div class="map-name">${mp.name}</div>`;
+    card.onclick = () => { if (myId === 1) send({ type: 'map', map: mp.id }); };
+    mg.appendChild(card);
+    drawMapThumb(card.querySelector('canvas'), mp.id);
+  });
+
+  $('readyBtn').onclick = () => { send({ type: 'ready' }); $('readyBtn').disabled = true; };
+  $('rematchBtn').onclick = () => { send({ type: 'rematch' }); showLobby(); };
+}
+
+function drawTankIcon(cv, tk) {
+  const c = cv.getContext('2d');
+  c.clearRect(0, 0, 90, 54);
+  c.fillStyle = tk.dark; c.fillRect(20, 36, 50, 10);           // 트레드
+  c.fillStyle = tk.color; c.fillRect(26, 24, 38, 14);          // 몸통
+  c.beginPath(); c.arc(45, 24, 9, Math.PI, 0); c.fill();       // 포탑
+  c.strokeStyle = tk.color; c.lineWidth = 4;
+  c.beginPath(); c.moveTo(45, 20); c.lineTo(64, 8); c.stroke(); // 포신
+}
+
+function drawMapThumb(cv, mapId) {
+  const c = cv.getContext('2d');
+  const mp = MAPS[mapId];
+  const t = genTerrain(mapId, 12345); // 미리보기용 고정 시드
+  const sky = c.createLinearGradient(0, 0, 0, 90);
+  sky.addColorStop(0, mp.sky[0]); sky.addColorStop(1, mp.sky[1]);
+  c.fillStyle = sky; c.fillRect(0, 0, 220, 90);
+  c.fillStyle = mp.ground;
+  c.beginPath(); c.moveTo(0, 90);
+  for (let x = 0; x < 220; x++) c.lineTo(x, t[Math.floor(x / 220 * W)] / H * 90);
+  c.lineTo(220, 90); c.closePath(); c.fill();
+}
+
+function renderLobby(connected) {
+  // 탱크 카드 표시
+  TANKS.forEach((tk) => {
+    const card = $('tk' + tk.id);
+    card.classList.toggle('me',  lobby.picks[myId - 1] === tk.id);
+    card.classList.toggle('foe', lobby.picks[2 - myId] === tk.id);
+    card.querySelectorAll('.pick-tag').forEach(el => el.remove());
+    [0, 1].forEach(slot => {
+      if (lobby.picks[slot] === tk.id) {
+        const tag = document.createElement('div');
+        tag.className = 'pick-tag t' + (slot + 1);
+        tag.textContent = 'P' + (slot + 1);
+        card.appendChild(tag);
+      }
+    });
+  });
+  // 맵 카드
+  MAPS.forEach((mp) => {
+    const card = $('mp' + mp.id);
+    card.classList.toggle('sel', lobby.map === mp.id);
+    card.classList.toggle('locked', myId !== 1);
+  });
+  // 상대 상태
+  const foeSlot = 2 - myId; // 상대 인덱스(0-based)
+  const foeOn = connected && connected[foeSlot];
+  const fb = $('foeBadge');
+  if (foeOn) {
+    fb.textContent = 'P' + (foeSlot + 1) + (lobby.ready[foeSlot] ? ' 준비완료!' : ' 접속함');
+    fb.className = 'badge p' + (foeSlot + 1);
+  } else {
+    fb.textContent = '대기 중'; fb.className = 'badge wait';
+  }
+  $('lobbyMsg').textContent = foeOn
+    ? (lobby.ready[foeSlot] ? '상대가 준비를 마쳤습니다!' : '탱크를 고르고 준비 버튼을 누르세요')
+    : '상대를 기다리는 중... (다른 컴퓨터에서 접속)';
+  // 준비 버튼
+  const iPicked = lobby.picks[myId - 1] != null;
+  $('readyBtn').disabled = !iPicked || lobby.ready[myId - 1];
+  $('readyBtn').textContent = lobby.ready[myId - 1] ? '상대 기다리는 중...' : '준비 완료!';
+}
+
+function showLobby() {
+  G = null;
+  $('overOverlay').classList.remove('on');
+  $('gameScreen').classList.remove('on');
+  $('lobbyScreen').classList.add('on');
+}
+
+// 방이 가득 찼거나 잘못된 코드일 때 랜딩 화면으로 되돌리기
+function backToLanding() {
+  $('lobbyScreen').classList.remove('on');
+  $('gameScreen').classList.remove('on');
+  $('landingScreen').classList.add('on');
+}
+</script>
+<script>
+/* ═══════════════════════════════════════════════
+   게임 본체
+   ═══════════════════════════════════════════════ */
+const cv = $('game'), ctx = cv.getContext('2d');
+const DT = 1 / 120;           // 고정 시뮬레이션 스텝 (양쪽 PC에서 동일한 결과)
+const GRAV = 230;             // 중력 (px/s^2)
+const WIND_ACC = 11;          // 바람 세기 1당 가속도
+const TANK_R = 13;            // 탱크 히트 반경
+
+function startGame(m) {
+  const terrain = genTerrain(m.map, m.seed);
+  const spawnX = [Math.floor(W * 0.11), Math.floor(W * 0.89)];
+  G = {
+    map: m.map, terrain,
+    wind: m.wind, turn: m.turn, phase: 'aim',
+    tanks: [0, 1].map((i) => ({
+      def: TANKS[m.tanks[i]],
+      x: spawnX[i], y: terrain[spawnX[i]],
+      hp: 100, alive: true,
+      angle: i === 0 ? 60 : 120,
+      weapon: 0, fuel: TANKS[m.tanks[i]].move,
+      vy: 0, fallFrom: null,
+    })),
+    projectiles: [], explosions: [], texts: [], pending: [],
+    power: 0, charging: false,
+    stepAcc: 0, lastAimSend: 0, lastMoveSend: 0,
+    resolved: false,
+  };
+  buildWeaponBtns();
+  $('lobbyScreen').classList.remove('on');
+  $('gameScreen').classList.add('on');
+  toast(G.turn === myId ? '당신의 턴! 🎯' : '상대의 턴입니다');
+}
+
+const me   = () => G.tanks[myId - 1];
+const isMyTurn = () => G && G.turn === myId && G.phase === 'aim' && me().alive;
+const activeTank = () => G.tanks[G.turn - 1];
+
+/* ── 무기 버튼 ── */
+function buildWeaponBtns() {
+  const t = me();
+  [0, 1].forEach((i) => {
+    const w = t.def.weapons[i];
+    const btn = $('w' + i + 'btn');
+    btn.innerHTML = `<b>${i + 1}. ${w.name}</b><small>${w.info}</small>`;
+    btn.onclick = () => selectWeapon(i);
+  });
+  updateWeaponBtns();
+}
+function updateWeaponBtns() {
+  [0, 1].forEach(i => $('w' + i + 'btn').classList.toggle('sel', me().weapon === i));
+}
+function selectWeapon(i) {
+  if (!G) return;
+  me().weapon = i; updateWeaponBtns();
+  if (isMyTurn()) send({ type: 'aim', angle: me().angle, weapon: i });
+}
+
+/* ── 입력 ── */
+const keys = {};
+window.addEventListener('keydown', (e) => {
+  if (!G) return;
+  if (['ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault();
+  if (e.key === '1') selectWeapon(0);
+  if (e.key === '2') selectWeapon(1);
+  if (e.key === ' ' && isMyTurn() && !keys[' ']) { G.charging = true; G.power = 0; }
+  keys[e.key] = true;
+});
+window.addEventListener('keyup', (e) => {
+  keys[e.key] = false;
+  if (e.key === ' ' && G && G.charging) {
+    G.charging = false;
+    if (isMyTurn() && G.power >= 8) fireMine();
+  }
+});
+
+function fireMine() {
+  send({ type: 'fire', angle: me().angle, power: G.power, weapon: me().weapon });
+  G.phase = 'wait'; // 서버가 되돌려주는 fire 메시지를 기다림 (양쪽 동시 시작)
+}
+
+/* ── 네트워크로 받은 상대 상태 ── */
+function netMove(x) { const t = G.tanks[G.turn - 1]; t.x = x; settleTank(t, true); }
+function netAim(m)  { const t = G.tanks[m.from - 1]; if (m.angle != null) t.angle = m.angle; if (m.weapon != null) t.weapon = m.weapon; }
+
+/* ── 발사 (양쪽 클라이언트에서 동일하게 실행) ── */
+function onFire(m) {
+  if (!G) return;
+  const shooter = G.tanks[m.from - 1];
+  shooter.angle = m.angle; shooter.weapon = m.weapon;
+  G.phase = 'fly'; G.resolved = false; G.power = 0; G.charging = false;
+  spawnShot(shooter, m.angle, m.power, m.weapon);
+  const w = shooter.def.weapons[m.weapon];
+  if (w.kind === 'twin') { // 2연발: 0.3초 뒤 두 번째 탄 (고정 스텝이라 결정적)
+    G.pending.push({ steps: 36, shooter, angle: m.angle, power: m.power, weapon: m.weapon });
+  }
+  sfx('fire');
+}
+
+function spawnShot(shooter, angle, power, weaponIdx) {
+  const w = shooter.def.weapons[weaponIdx];
+  const rad = angle * Math.PI / 180;
+  const speedMul = (w.kind === 'fast') ? 1.25 : 1.0;
+  const v = power * 6.6 * speedMul;
+  const bx = shooter.x + Math.cos(rad) * 22;
+  const by = shooter.y - 12 - Math.sin(rad) * 22;
+  G.projectiles.push({
+    x: bx, y: by,
+    vx: Math.cos(rad) * v, vy: -Math.sin(rad) * v,
+    w, owner: shooter, split: false,
+    gravMul: shooter.def.gravMul * ((w.kind === 'fast') ? 0.8 : 1.0),
+    trail: [],
+  });
+}
+
+/* ── 고정 스텝 물리 ── */
+function physicsStep() {
+  // 예약된 발사 (트윈스 2연발)
+  for (let i = G.pending.length - 1; i >= 0; i--) {
+    const p = G.pending[i];
+    if (--p.steps <= 0) { spawnShot(p.shooter, p.angle, p.power, p.weapon); sfx('fire'); G.pending.splice(i, 1); }
+  }
+
+  for (let i = G.projectiles.length - 1; i >= 0; i--) {
+    const p = G.projectiles[i];
+    p.vx += G.wind * WIND_ACC * DT;
+    p.vy += GRAV * p.gravMul * DT;
+    p.x += p.vx * DT;
+    p.y += p.vy * DT;
+    if ((p.trail._n = (p.trail._n | 0) + 1) % 4 === 0) { p.trail.push({ x: p.x, y: p.y }); if (p.trail.length > 24) p.trail.shift(); }
+
+    // 분열탄: 정점(하강 시작)에서 3발로
+    if (p.w.kind === 'split' && !p.split && p.vy > 0) {
+      p.split = true;
+      [-70, 70].forEach(dv => {
+        G.projectiles.push({ x: p.x, y: p.y, vx: p.vx + dv, vy: p.vy, w: p.w, owner: p.owner, split: true, gravMul: p.gravMul, trail: [] });
+      });
+    }
+
+    // 지형 or 탱크 충돌
+    const gx = Math.round(p.x);
+    let hit = false;
+    if (p.x < -60 || p.x > W + 60 || p.y > H + 80) { G.projectiles.splice(i, 1); continue; }
+    if (gx >= 0 && gx < W && p.y >= G.terrain[gx]) hit = true;
+    if (!hit) for (const t of G.tanks) {
+      if (t.alive && Math.hypot(t.x - p.x, (t.y - 10) - p.y) < TANK_R + 4) { hit = true; break; }
+    }
+    if (hit) { explode(p.x, Math.min(p.y, gx >= 0 && gx < W ? G.terrain[gx] : p.y), p.w); G.projectiles.splice(i, 1); }
+  }
+
+  // 탱크 낙하 (지형이 파여서 공중에 뜬 경우)
+  for (const t of G.tanks) {
+    if (!t.alive) continue;
+    const gy = groundY(t.x);
+    if (t.y < gy - 0.5) {
+      if (t.fallFrom == null) t.fallFrom = t.y;
+      t.vy += GRAV * DT;
+      t.y = Math.min(gy, t.y + t.vy * DT);
+    }
+    if (t.y >= gy - 0.5) {
+      if (t.fallFrom != null) {
+        const fell = gy - t.fallFrom;
+        if (fell > 70) { const d = Math.round((fell - 70) * 0.25); if (d > 0) hurt(t, d, '낙하'); }
+        t.fallFrom = null;
+      }
+      t.y = gy; t.vy = 0;
+    }
+    if (t.y > H + 40) { t.alive = false; t.hp = 0; } // 맵 밖으로 추락
+  }
+}
+
+function groundY(x) {
+  const gx = Math.max(0, Math.min(W - 1, Math.round(x)));
+  return G.terrain[gx];
+}
+
+/* ── 폭발 ── */
+function explode(ex, ey, w) {
+  // 지형 파괴
+  const r = w.radius;
+  for (let x = Math.max(0, Math.floor(ex - r)); x <= Math.min(W - 1, Math.ceil(ex + r)); x++) {
+    const dx = x - ex;
+    const depth = Math.sqrt(Math.max(0, r * r - dx * dx));
+    const top = ey - depth, bottom = ey + depth;
+    if (G.terrain[x] >= top && G.terrain[x] <= bottom) G.terrain[x] = bottom;       // 표면이 원 안 → 원 바닥까지 깎임
+    else if (G.terrain[x] < top) G.terrain[x] += depth * 2 * 0.6;                    // 지하 폭발 → 지반 침하
+    G.terrain[x] = Math.min(H + 200, G.terrain[x]);
+  }
+  // 탱크 데미지 (거리 비례)
+  for (const t of G.tanks) {
+    if (!t.alive) continue;
+    const d = Math.hypot(t.x - ex, (t.y - 10) - ey);
+    const reach = r + TANK_R + 6;
+    if (d < reach) {
+      const dmg = Math.max(1, Math.round(w.dmg * (1 - (d / reach) * 0.75)));
+      hurt(t, dmg, null);
+    }
+  }
+  G.explosions.push({ x: ex, y: ey, r: 2, max: r, life: 0 });
+  sfx('boom');
+}
+
+function hurt(t, dmg, label) {
+  t.hp = Math.max(0, t.hp - dmg);
+  G.texts.push({ x: t.x, y: t.y - 44, txt: (label ? label + ' ' : '') + '-' + dmg, life: 0, color: '#ff5252' });
+  if (t.hp <= 0) t.alive = false;
+}
+
+/* ── 턴 종료 판정 (발사한 쪽이 결과를 서버로 보냄) ── */
+function checkResolve() {
+  if (G.phase !== 'fly' || G.resolved) return;
+  const busy = G.projectiles.length > 0 || G.pending.length > 0
+    || G.tanks.some(t => t.alive && t.y < groundY(t.x) - 0.5);
+  if (busy) return;
+  G.resolved = true;
+  G.phase = 'settle';
+  if (G.turn === myId) { // 내가 쏜 턴 → 내가 결과 확정
+    setTimeout(() => {
+      const dead = G.tanks.findIndex(t => !t.alive);
+      if (dead !== -1) {
+        const winner = G.tanks[0].alive === G.tanks[1].alive ? 0 : (G.tanks[0].alive ? 1 : 2);
+        send({ type: 'gameover', winner });
+      } else {
+        send({ type: 'turnDone', sync: { hp: G.tanks.map(t => t.hp), x: G.tanks.map(t => t.x), alive: G.tanks.map(t => t.alive) } });
+      }
+    }, 500);
+  }
+}
+
+/* ── 새 턴 ── */
+function onTurn(m) {
+  if (!G) return;
+  if (m.sync) { // 오차 보정: 발사자 기준으로 스냅
+    G.tanks.forEach((t, i) => {
+      t.hp = m.sync.hp[i]; t.x = m.sync.x[i]; t.alive = m.sync.alive[i];
+      t.y = groundY(t.x); t.vy = 0; t.fallFrom = null;
+    });
+  }
+  G.wind = m.wind; G.turn = m.turn; G.phase = 'aim';
+  G.power = 0; G.charging = false;
+  const t = activeTank();
+  t.fuel = t.def.move;
+  toast(G.turn === myId ? '당신의 턴! 🎯 (바람을 확인하세요)' : '상대의 턴입니다');
+}
+
+function onGameOver(winner) {
+  if (!G) return;
+  G.phase = 'over';
+  const txt = winner === 0 ? '무승부!' : (winner === myId ? '🏆 승리!' : '패배...');
+  $('overText').textContent = txt;
+  $('overText').style.color = winner === myId ? 'var(--accent)' : '#aab';
+  $('overOverlay').classList.add('on');
+}
+</script>
+<script>
+/* ═══════════════════════════════════════════════
+   메인 루프: 입력 처리 + 렌더링
+   ═══════════════════════════════════════════════ */
+let lastT = performance.now();
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (now - lastT) / 1000);
+  lastT = now;
+  if (!G) return;
+
+  /* ── 내 턴 입력 ── */
+  if (isMyTurn()) {
+    const t = me();
+    // 이동 (연료 제한, 급경사 차단)
+    let dir = (keys['d'] || keys['D'] || keys['ㅇ'] ? 1 : 0) - (keys['a'] || keys['A'] || keys['ㅁ'] ? 1 : 0);
+    if (dir !== 0 && t.fuel > 0 && !G.charging) {
+      const step = dir * 60 * dt;
+      const nx = Math.max(16, Math.min(W - 16, t.x + step));
+      if (Math.abs(groundY(nx) - t.y) < 26) {
+        t.x = nx; t.y = groundY(nx);
+        t.fuel = Math.max(0, t.fuel - Math.abs(step));
+        if (now - G.lastMoveSend > 80) { send({ type: 'move', x: t.x }); G.lastMoveSend = now; }
+      }
+    }
+    // 각도
+    let da = (keys['ArrowLeft'] ? 1 : 0) - (keys['ArrowRight'] ? 1 : 0);
+    if (da !== 0) {
+      t.angle = Math.max(0, Math.min(180, t.angle + da * 60 * dt));
+      if (now - G.lastAimSend > 100) { send({ type: 'aim', angle: t.angle, weapon: t.weapon }); G.lastAimSend = now; }
+    }
+    // 파워 충전
+    if (G.charging) G.power = Math.min(100, G.power + 62 * dt);
+  }
+
+  /* ── 물리 (고정 스텝) ── */
+  if (G.phase === 'fly' || G.phase === 'settle') {
+    G.stepAcc += dt;
+    while (G.stepAcc >= DT) { physicsStep(); G.stepAcc -= DT; }
+    checkResolve();
+  }
+
+  /* ── 이펙트 수명 ── */
+  G.explosions = G.explosions.filter(e => (e.life += dt) < 0.5);
+  G.texts = G.texts.filter(t => (t.life += dt) < 1.4);
+
+  render();
+}
+requestAnimationFrame(loop);
+
+/* ═══════════════════════════════════════════════
+   렌더링
+   ═══════════════════════════════════════════════ */
+function render() {
+  const mp = MAPS[G.map];
+  // 하늘
+  const sky = ctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, mp.sky[0]); sky.addColorStop(1, mp.sky[1]);
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+  // 밤 맵이면 별
+  if (G.map === 2) {
+    ctx.fillStyle = 'rgba(255,255,255,.7)';
+    for (let i = 0; i < 40; i++) ctx.fillRect((i * 137) % W, (i * 71) % (H / 2), 2, 2);
+  }
+
+  // 지형
+  ctx.fillStyle = mp.dirt;
+  ctx.beginPath(); ctx.moveTo(0, H);
+  for (let x = 0; x < W; x++) ctx.lineTo(x, G.terrain[x]);
+  ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = mp.ground; ctx.lineWidth = 7;
+  ctx.beginPath();
+  for (let x = 0; x < W; x++) { const y = G.terrain[x]; x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+  ctx.stroke();
+
+  // 탱크
+  G.tanks.forEach((t, i) => { if (t.alive) drawTank(t, i); });
+
+  // 포탄 + 궤적
+  for (const p of G.projectiles) {
+    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    p.trail.forEach((pt, j) => j === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y));
+    ctx.stroke();
+    ctx.fillStyle = p.owner.def.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+
+  // 폭발
+  for (const e of G.explosions) {
+    const k = e.life / 0.5;
+    ctx.globalAlpha = 1 - k;
+    ctx.fillStyle = '#ffcf3d';
+    ctx.beginPath(); ctx.arc(e.x, e.y, e.max * (0.3 + k * 0.9), 0, 7); ctx.fill();
+    ctx.fillStyle = '#ff5722';
+    ctx.beginPath(); ctx.arc(e.x, e.y, e.max * k * 0.7, 0, 7); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // 데미지 텍스트
+  for (const t of G.texts) {
+    ctx.globalAlpha = 1 - t.life / 1.4;
+    ctx.fillStyle = t.color; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(t.txt, t.x, t.y - t.life * 34);
+    ctx.globalAlpha = 1;
+  }
+
+  drawTopUI();
+}
+
+function drawTank(t, i) {
+  const c = t.def.color, dk = t.def.dark;
+  const isActive = (G.turn === i + 1) && G.phase === 'aim';
+  // 포신
+  const rad = t.angle * Math.PI / 180;
+  ctx.strokeStyle = dk; ctx.lineWidth = 6; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(t.x, t.y - 12);
+  ctx.lineTo(t.x + Math.cos(rad) * 26, t.y - 12 - Math.sin(rad) * 26);
+  ctx.stroke();
+  // 몸통
+  ctx.fillStyle = dk; roundRect(t.x - 16, t.y - 9, 32, 9, 4);          // 트레드
+  ctx.fillStyle = c;  roundRect(t.x - 13, t.y - 17, 26, 9, 3);         // 차체
+  ctx.beginPath(); ctx.arc(t.x, t.y - 17, 8, Math.PI, 0); ctx.fill();  // 포탑
+
+  // 이름 + HP바
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 13px sans-serif';
+  ctx.fillStyle = '#fff'; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 3;
+  const label = `P${i + 1} ${t.def.name}`;
+  ctx.strokeText(label, t.x, t.y - 44); ctx.fillText(label, t.x, t.y - 44);
+  ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(t.x - 24, t.y - 40, 48, 7);
+  ctx.fillStyle = t.hp > 40 ? '#4cd964' : (t.hp > 15 ? '#ffd93d' : '#ff5252');
+  ctx.fillRect(t.x - 24, t.y - 40, 48 * t.hp / 100, 7);
+  ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.strokeRect(t.x - 24, t.y - 40, 48, 7);
+
+  // 현재 턴 표시 화살표
+  if (isActive) {
+    ctx.fillStyle = '#ffd93d';
+    ctx.beginPath();
+    ctx.moveTo(t.x, t.y - 58); ctx.lineTo(t.x - 8, t.y - 70); ctx.lineTo(t.x + 8, t.y - 70);
+    ctx.closePath(); ctx.fill();
+  }
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath(); ctx.fill();
+}
+
+function drawTopUI() {
+  // ── 바람 표시 (상단 중앙) ──
+  const wx = W / 2, wy = 34;
+  ctx.fillStyle = 'rgba(0,0,0,.4)'; roundRect(wx - 120, 12, 240, 44, 10);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center';
+  const wstr = Math.abs(G.wind).toFixed(1);
+  ctx.fillText(`바람 ${wstr}`, wx, wy - 2);
+  // 화살표
+  const dir = Math.sign(G.wind) || 0;
+  const len = Math.min(90, Math.abs(G.wind) * 11);
+  ctx.strokeStyle = '#7ecbff'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+  if (dir !== 0) {
+    ctx.beginPath();
+    ctx.moveTo(wx - dir * len / 2, wy + 12); ctx.lineTo(wx + dir * len / 2, wy + 12);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(wx + dir * len / 2 + dir * 8, wy + 12);
+    ctx.lineTo(wx + dir * len / 2 - dir * 4, wy + 5);
+    ctx.lineTo(wx + dir * len / 2 - dir * 4, wy + 19);
+    ctx.closePath(); ctx.fillStyle = '#7ecbff'; ctx.fill();
+  } else {
+    ctx.fillText('무풍', wx, wy + 18);
+  }
+
+  // ── 턴 표시 ──
+  ctx.font = 'bold 17px sans-serif';
+  ctx.fillStyle = G.turn === myId ? '#ffd93d' : '#aab4d8';
+  ctx.textAlign = 'left';
+  ctx.fillText(G.phase === 'over' ? '게임 종료' : (G.turn === myId ? '▶ 내 턴' : '상대 턴...'), 20, 34);
+
+  // ── 내 상태 패널 (좌하단) ──
+  const t = me();
+  if (t.alive && G.phase !== 'over') {
+    ctx.fillStyle = 'rgba(0,0,0,.45)'; roundRect(14, H - 96, 300, 82, 10);
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText(`각도 ${Math.round(t.angle)}°`, 28, H - 72);
+    ctx.fillText(`연료`, 28, H - 48);
+    ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.fillRect(80, H - 58, 180, 10);
+    ctx.fillStyle = '#4cd9c0'; ctx.fillRect(80, H - 58, 180 * t.fuel / t.def.move, 10);
+    ctx.fillStyle = '#fff'; ctx.fillText(`파워`, 28, H - 26);
+    ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.fillRect(80, H - 36, 180, 12);
+    const pw = G.charging || isMyTurn() ? G.power : 0;
+    ctx.fillStyle = pw > 75 ? '#ff5252' : '#ffd93d';
+    ctx.fillRect(80, H - 36, 180 * pw / 100, 12);
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   효과음 (WebAudio 간단 합성)
+   ═══════════════════════════════════════════════ */
+let AC = null;
+function sfx(kind) {
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.connect(g); g.connect(AC.destination);
+    const now = AC.currentTime;
+    if (kind === 'fire') {
+      o.type = 'square'; o.frequency.setValueAtTime(420, now);
+      o.frequency.exponentialRampToValueAtTime(90, now + 0.18);
+      g.gain.setValueAtTime(0.12, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+      o.start(now); o.stop(now + 0.2);
+    } else {
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(160, now);
+      o.frequency.exponentialRampToValueAtTime(30, now + 0.45);
+      g.gain.setValueAtTime(0.22, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+      o.start(now); o.stop(now + 0.5);
+    }
+  } catch (e) { /* 소리 실패해도 게임은 계속 */ }
+}
+
+/* ── 탱크 위치 보정 유틸 ── */
+function settleTank(t, snap) { if (snap) t.y = groundY(t.x); }
+
+/* ── 시작! ── */
+buildLobby();
+initLanding();
+</script>
+</body>
+</html>
