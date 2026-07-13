@@ -11,10 +11,47 @@ const { WebSocketServer } = require('ws');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC = path.join(__dirname, 'public');
+const LEADERBOARD_FILE = path.join(__dirname, 'leaderboard.json');
 
-// ── 정적 파일 서버 ──
+// ── 명예의 전당 (1인용 아케이드 3연승 클리어 기록) ──
+// 재시작 후에도 유지되도록 파일에 저장 (배포 플랫폼에 따라 디스크가 초기화될 수도 있음)
+let leaderboard = [];
+try { leaderboard = JSON.parse(fs.readFileSync(LEADERBOARD_FILE, 'utf8')); } catch { leaderboard = []; }
+
+function saveLeaderboard() {
+  try { fs.writeFileSync(LEADERBOARD_FILE, JSON.stringify(leaderboard)); } catch { /* 저장 실패해도 서버는 계속 동작 */ }
+}
+
+function readBody(req, cb) {
+  let body = '';
+  req.on('data', (chunk) => { body += chunk; if (body.length > 1e4) req.destroy(); });
+  req.on('end', () => { try { cb(JSON.parse(body)); } catch { cb(null); } });
+}
+
+// ── 정적 파일 서버 + 명예의 전당 API ──
 const server = http.createServer((req, res) => {
   const pathname = urlLib.parse(req.url).pathname;
+
+  if (pathname === '/api/leaderboard' && req.method === 'GET') {
+    const top = leaderboard.slice().sort((a, b) => a.turns - b.turns).slice(0, 10);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify(top));
+  }
+
+  if (pathname === '/api/leaderboard' && req.method === 'POST') {
+    return readBody(req, (data) => {
+      const name = data && typeof data.name === 'string' ? data.name.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3) || 'AAA' : 'AAA';
+      const turns = data && Number.isFinite(data.turns) ? Math.max(1, Math.min(999, Math.round(data.turns))) : null;
+      if (!turns) { res.writeHead(400); return res.end('{}'); }
+      leaderboard.push({ name, turns, date: Date.now() });
+      leaderboard.sort((a, b) => a.turns - b.turns);
+      leaderboard = leaderboard.slice(0, 50); // 상위 50개까지만 보관
+      saveLeaderboard();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(leaderboard.slice(0, 10)));
+    });
+  }
+
   let file = pathname === '/' ? '/index.html' : pathname;
   const full = path.join(PUBLIC, path.normalize(file));
   if (!full.startsWith(PUBLIC)) { res.writeHead(403); return res.end(); }

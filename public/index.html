@@ -193,6 +193,14 @@
 <div id="landingScreen" class="screen on" style="max-width:460px;">
   <div class="landing-box">
     <div class="landing-option">
+      <h3>■ 1인용</h3>
+      <div class="mode-row">
+        <button class="landing-btn" id="soloEnterBtn" style="width:100%;">🕹️ 아케이드 (CPU 3연전)</button>
+      </div>
+      <button class="landing-btn ghost" id="leaderboardBtn" style="width:100%;">🏆 명예의 전당</button>
+    </div>
+    <div class="divider">또는 함께 플레이</div>
+    <div class="landing-option">
       <h3>■ 게임 방식</h3>
       <div class="mode-row">
         <button class="mode-btn sel" id="mode1v1Btn">1:1 대전 (2인)</button>
@@ -216,8 +224,8 @@
   <div class="howto-box">
     <h3>▶ 시작하는 법</h3>
     <ol>
-      <li>게임 방식(1:1 또는 2:2) 선택 후 "방 만들고 링크 공유하기" 클릭</li>
-      <li>🔗 링크 복사 버튼으로 함께할 사람에게 링크 전달 (카톡/디스코드 등)</li>
+      <li><b>1인용:</b> 탱크 하나를 고르면 나머지 3대와 순서대로 3연전! 3연승하면 이니셜을 명예의 전당에 남길 수 있어요</li>
+      <li><b>함께 플레이:</b> 게임 방식 선택 후 "방 만들고 링크 공유하기" → 🔗 링크 복사해서 전달</li>
       <li>2:2는 4명이 같은 링크로 입장 — 먼저 들어온 2명이 팀A, 나머지 2명이 팀B가 됩니다</li>
       <li>각자 탱크 선택 → 방장(P1)이 맵 선택 → 전원 "준비 완료!" → 게임 시작</li>
     </ol>
@@ -235,6 +243,36 @@
       처음 접속 시 로딩에 20~30초 정도 걸릴 수 있어요 — 새로고침 연타하지 말고 잠깐 기다려주세요.<br>
       서로 다른 방 코드를 쓰면 여러 그룹이 동시에 플레이할 수 있어요.
     </div>
+  </div>
+</div>
+
+<!-- ═══════════ 1인용 탱크 선택 화면 ═══════════ -->
+<div id="soloScreen" class="screen" style="max-width:640px;">
+  <div class="section-title">■ 탱크 선택 — CPU 3연전에 도전할 탱크를 고르세요</div>
+  <div class="tank-grid" id="soloTankGrid"></div>
+  <button class="landing-btn ghost" id="soloBackBtn" style="margin-top:14px;">← 뒤로</button>
+</div>
+
+<!-- ═══════════ 이니셜 입력 화면 (3연승 클리어) ═══════════ -->
+<div id="initialsScreen" class="screen" style="max-width:420px;">
+  <div class="landing-box" style="text-align:center;">
+    <h3 style="color:var(--accent); font-size:20px; letter-spacing:3px;">🏆 3연승 클리어! 🏆</h3>
+    <div id="initialsScoreText" class="hint" style="font-size:14px;">총 0턴 만에 클리어</div>
+    <div>
+      <input id="initialsInput" maxlength="3" placeholder="AAA" autocomplete="off"
+        style="width:140px; text-align:center; font-size:28px; letter-spacing:10px; font-weight:800;
+        background:var(--panel2); border:2px solid var(--line); border-radius:10px; color:var(--accent); padding:10px; text-transform:uppercase;">
+    </div>
+    <button class="landing-btn" id="initialsSubmitBtn" style="width:100%;">명예의 전당에 등록</button>
+  </div>
+</div>
+
+<!-- ═══════════ 명예의 전당 화면 ═══════════ -->
+<div id="leaderboardScreen" class="screen" style="max-width:420px;">
+  <div class="landing-box">
+    <h3 style="color:var(--accent); text-align:center; font-size:16px; letter-spacing:2px;">🏆 명예의 전당 (최소 턴 클리어 순)</h3>
+    <table id="leaderboardTable" style="width:100%; border-collapse:collapse; font-size:14px;"></table>
+    <button class="landing-btn ghost" id="leaderboardBackBtn" style="width:100%;">← 뒤로</button>
   </div>
 </div>
 
@@ -445,6 +483,10 @@ function initLanding() {
     location.href = roomUrl(code);
   };
   $('joinCodeInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('joinRoomBtn').click(); });
+  $('soloEnterBtn').onclick = openSoloPick;
+  $('soloBackBtn').onclick = () => { $('soloScreen').classList.remove('on'); $('landingScreen').classList.add('on'); };
+  $('leaderboardBtn').onclick = () => openLeaderboard('landingScreen');
+  $('leaderboardBackBtn').onclick = () => { $('leaderboardScreen').classList.remove('on'); $(leaderboardReturnTo).classList.add('on'); };
 }
 
 function enterLobby() {
@@ -466,7 +508,7 @@ function connect() {
   ws.onmessage = (e) => handleMsg(JSON.parse(e.data));
   ws.onclose = () => { toast('서버 연결이 끊어졌습니다. 새로고침 해주세요.', 8000); };
 }
-function send(msg) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); }
+function send(msg) { if (G && G.isSolo) return; if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); }
 
 function handleMsg(m) {
   switch (m.type) {
@@ -491,21 +533,23 @@ function handleMsg(m) {
 }
 
 /* ── 로비 렌더링 ── */
+function createTankCard(tk, onClick) {
+  const card = document.createElement('div');
+  card.className = 'tank-card'; card.id = 'tk' + tk.id;
+  card.innerHTML = `
+    <canvas width="90" height="54"></canvas>
+    <div class="tank-name" style="color:${tk.color}">${tk.name}</div>
+    <div class="tank-desc">${tk.desc}<br>
+      <b>일반:</b> ${tk.weapons[0].info}<br>
+      <b>강력:</b> ${tk.weapons[1].info}</div>`;
+  card.onclick = onClick;
+  drawTankIcon(card.querySelector('canvas'), tk);
+  return card;
+}
+
 function buildLobby() {
   const tg = $('tankGrid');
-  TANKS.forEach((tk) => {
-    const card = document.createElement('div');
-    card.className = 'tank-card'; card.id = 'tk' + tk.id;
-    card.innerHTML = `
-      <canvas width="90" height="54"></canvas>
-      <div class="tank-name" style="color:${tk.color}">${tk.name}</div>
-      <div class="tank-desc">${tk.desc}<br>
-        <b>일반:</b> ${tk.weapons[0].info}<br>
-        <b>강력:</b> ${tk.weapons[1].info}</div>`;
-    card.onclick = () => send({ type: 'pick', tank: tk.id });
-    tg.appendChild(card);
-    drawTankIcon(card.querySelector('canvas'), tk);
-  });
+  TANKS.forEach((tk) => tg.appendChild(createTankCard(tk, () => send({ type: 'pick', tank: tk.id }))));
 
   const mg = $('mapGrid');
   MAPS.forEach((mp) => {
@@ -520,6 +564,13 @@ function buildLobby() {
   $('readyBtn').onclick = () => { send({ type: 'ready' }); $('readyBtn').disabled = true; };
   $('rematchBtn').onclick = () => { send({ type: 'rematch' }); showLobby(); };
   $('muteBtn').onclick = toggleMute;
+
+  buildSoloTankGrid();
+}
+
+function buildSoloTankGrid() {
+  const sg = $('soloTankGrid');
+  TANKS.forEach((tk) => sg.appendChild(createTankCard(tk, () => startSolo(tk.id))));
 }
 
 function drawTankIcon(cv, tk) {
@@ -710,26 +761,36 @@ window.addEventListener('keyup', (e) => {
 });
 
 function fireMine() {
-  send({ type: 'fire', angle: me().angle, power: G.power, weapon: me().weapon });
-  G.phase = 'wait'; // 서버가 되돌려주는 fire 메시지를 기다림 (양쪽 동시 시작)
+  if (G.isSolo) {
+    triggerFire(me(), me().angle, G.power, me().weapon);
+  } else {
+    send({ type: 'fire', angle: me().angle, power: G.power, weapon: me().weapon });
+    G.phase = 'wait'; // 서버가 되돌려주는 fire 메시지를 기다림 (양쪽 동시 시작)
+  }
 }
 
 /* ── 네트워크로 받은 상대 상태 ── */
 function netMove(x) { const t = G.tanks[G.turn - 1]; t.x = x; settleTank(t, true); }
 function netAim(m)  { const t = G.tanks[m.from - 1]; if (m.angle != null) t.angle = m.angle; if (m.weapon != null) t.weapon = m.weapon; }
 
-/* ── 발사 (양쪽 클라이언트에서 동일하게 실행) ── */
+/* ── 발사 실행 공통 로직 (네트워크 수신 / 솔로 로컬 / CPU 모두 여기로) ── */
+function triggerFire(shooter, angle, power, weaponIdx) {
+  if (!G) return;
+  shooter.angle = angle; shooter.weapon = weaponIdx;
+  G.phase = 'fly'; G.resolved = false; G.power = 0; G.charging = false;
+  spawnShot(shooter, angle, power, weaponIdx);
+  const w = shooter.def.weapons[weaponIdx];
+  if (w.kind === 'twin') { // 2연발: 0.3초 뒤 두 번째 탄 (고정 스텝이라 결정적)
+    G.pending.push({ steps: 36, shooter, angle, power, weapon: weaponIdx });
+  }
+  sfx('fire');
+}
+
+/* ── 발사 (네트워크로 수신 - 상대/팀원이 쐈을 때) ── */
 function onFire(m) {
   if (!G) return;
   const shooter = G.tanks[m.from - 1];
-  shooter.angle = m.angle; shooter.weapon = m.weapon;
-  G.phase = 'fly'; G.resolved = false; G.power = 0; G.charging = false;
-  spawnShot(shooter, m.angle, m.power, m.weapon);
-  const w = shooter.def.weapons[m.weapon];
-  if (w.kind === 'twin') { // 2연발: 0.3초 뒤 두 번째 탄 (고정 스텝이라 결정적)
-    G.pending.push({ steps: 36, shooter, angle: m.angle, power: m.power, weapon: m.weapon });
-  }
-  sfx('fire');
+  triggerFire(shooter, m.angle, m.power, m.weapon);
 }
 
 function spawnShot(shooter, angle, power, weaponIdx) {
@@ -841,7 +902,7 @@ function hurt(t, dmg, label) {
   if (t.hp <= 0) t.alive = false;
 }
 
-/* ── 턴 종료 판정 (발사한 쪽이 결과를 서버로 보냄) ── */
+/* ── 턴 종료 판정 (발사한 쪽이 결과를 확정) ── */
 function checkResolve() {
   if (G.phase !== 'fly' || G.resolved) return;
   const busy = G.projectiles.length > 0 || G.pending.length > 0
@@ -849,7 +910,13 @@ function checkResolve() {
   if (busy) return;
   G.resolved = true;
   G.phase = 'settle';
-  if (G.turn === myId) { // 내가 쏜 턴 → 내가 결과 확정
+
+  if (G.isSolo) { // 솔로: 서버 없이 로컬에서 즉시 결과 확정
+    setTimeout(resolveSoloOutcome, 500);
+    return;
+  }
+
+  if (G.turn === myId) { // 내가 쏜 턴 → 내가 결과 확정 (네트워크 대전)
     setTimeout(() => {
       const { team1Alive, team2Alive } = teamStatus();
       if (!team1Alive || !team2Alive) {
@@ -860,6 +927,27 @@ function checkResolve() {
         send({ type: 'turnDone', nextTurn, sync: { hp: G.tanks.map(t => t.hp), x: G.tanks.map(t => t.x), alive: G.tanks.map(t => t.alive) } });
       }
     }, 500);
+  }
+}
+
+/* ── 솔로 모드: 턴 결과를 로컬에서 바로 확정 ── */
+function resolveSoloOutcome() {
+  const { team1Alive, team2Alive } = teamStatus(); // team1=플레이어, team2=CPU
+  if (!team1Alive || !team2Alive) {
+    onSoloRoundEnd(team1Alive); // 플레이어 생존 = 승리
+    return;
+  }
+  G.wind = randWindClient();
+  G.turn = computeNextTurn();
+  G.phase = 'aim'; G.power = 0; G.charging = false;
+  const t = activeTank();
+  t.fuel = t.def.move;
+  G.soloTurns = (G.soloTurns || 0) + 1;
+  if (G.turn === myId) {
+    toast('당신의 턴! 🎯 (바람을 확인하세요)');
+  } else {
+    toast('CPU가 조준 중...');
+    scheduleAiTurn();
   }
 }
 
@@ -887,7 +975,181 @@ function onGameOver(winner) {
   const txt = winner === 0 ? '무승부!' : (winner === myTeam ? '🏆 승리!' : '패배...');
   $('overText').textContent = txt;
   $('overText').style.color = winner === myTeam ? 'var(--accent)' : '#aab';
+  $('rematchBtn').textContent = '로비로 돌아가기';
+  $('rematchBtn').onclick = () => { send({ type: 'rematch' }); showLobby(); };
   $('overOverlay').classList.add('on');
+}
+
+/* ═══════════════════════════════════════════════
+   솔로 모드 (1인용 아케이드): CPU 3연전
+   ═══════════════════════════════════════════════ */
+function randWindClient() { return Math.round((Math.random() * 16 - 8) * 10) / 10; }
+
+// CPU가 특정 각도/파워로 쐈을 때 착탄 x좌표를 예측 (조준 계산용, 지형파괴/분열 등은 무시한 단순 탄도)
+function simulateLanding(angle, power, startX, startY, wind, gravMul, speedMul) {
+  const rad = angle * Math.PI / 180;
+  let x = startX + Math.cos(rad) * 22, y = startY - 12 - Math.sin(rad) * 22;
+  let vx = Math.cos(rad) * power * 6.6 * speedMul, vy = -Math.sin(rad) * power * 6.6 * speedMul;
+  for (let steps = 0; steps < 3000; steps++) {
+    vx += wind * WIND_ACC * DT; vy += GRAV * gravMul * DT;
+    x += vx * DT; y += vy * DT;
+    const gx = Math.round(x);
+    if (x < -100 || x > W + 100 || y > H + 150) return null;
+    if (gx >= 0 && gx < W && y >= G.terrain[gx]) return x;
+  }
+  return null;
+}
+
+// CPU 조준 결정: 라운드가 올라갈수록(difficulty 0~2) 오차가 줄어들어 더 정확해짐
+function aiChooseShot(cpu, target, difficulty) {
+  const dir = target.x >= cpu.x ? 1 : -1;
+  const baseAngle = dir > 0 ? 55 : 125;
+  const weapon = Math.random() < (0.3 + difficulty * 0.15) ? 1 : 0;
+  const w = cpu.def.weapons[weapon];
+  const speedMul = w.kind === 'fast' ? 1.25 : 1.0;
+  const gravMul = cpu.def.gravMul * (w.kind === 'fast' ? 0.8 : 1.0);
+
+  const errorRange = [90, 50, 22][difficulty] ?? 22; // 라운드별 조준 오차 범위(px)
+  const targetX = target.x + (Math.random() * 2 - 1) * errorRange;
+
+  // 파워 이진탐색으로 목표 x에 최대한 근접
+  let lo = 20, hi = 100, bestPower = 65, bestDiff = Infinity;
+  for (let i = 0; i < 16; i++) {
+    const mid = (lo + hi) / 2;
+    const land = simulateLanding(baseAngle, mid, cpu.x, cpu.y, G.wind, gravMul, speedMul);
+    if (land == null) { hi = mid; continue; }
+    const diff = land - targetX;
+    if (Math.abs(diff) < Math.abs(bestDiff)) { bestDiff = diff; bestPower = mid; }
+    if (Math.abs(diff) < 4) break;
+    if ((dir > 0 && diff < 0) || (dir < 0 && diff > 0)) lo = mid; else hi = mid;
+  }
+  const jitter = [7, 4, 1.5][difficulty] ?? 1.5;
+  const finalPower = Math.max(20, Math.min(100, bestPower + (Math.random() * 2 - 1) * jitter));
+  const finalAngle = Math.max(5, Math.min(175, baseAngle + (Math.random() * 2 - 1) * (9 - difficulty * 2)));
+  return { angle: finalAngle, power: finalPower, weapon };
+}
+
+function scheduleAiTurn() {
+  const delay = 850 + Math.random() * 700;
+  setTimeout(() => {
+    if (!G || !G.isSolo || G.phase !== 'aim' || G.turn === myId) return;
+    const cpu = G.tanks[G.turn - 1], target = G.tanks[myId - 1];
+    const { angle, power, weapon } = aiChooseShot(cpu, target, G.soloMeta.roundIdx);
+    triggerFire(cpu, angle, power, weapon);
+  }, delay);
+}
+
+/* ── 솔로 화면 전환/시작 ── */
+function openSoloPick() {
+  $('landingScreen').classList.remove('on');
+  $('soloScreen').classList.add('on');
+}
+
+function startSolo(tankId) {
+  const others = TANKS.map(t => t.id).filter(id => id !== tankId);
+  // 셔플 (3연전 CPU 순서 랜덤)
+  for (let i = others.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [others[i], others[j]] = [others[j], others[i]];
+  }
+  const meta = { playerTank: tankId, order: others, roundIdx: 0, totalTurns: 0 };
+  startSoloRound(meta);
+}
+
+function startSoloRound(meta) {
+  myId = 1; myTeam = 1; mode = 'solo';
+  const map = Math.floor(Math.random() * MAPS.length);
+  const seed = Math.floor(Math.random() * 1e9);
+  const wind = randWindClient();
+  startGame({ map, tanks: [meta.playerTank, meta.order[meta.roundIdx]], seed, wind, turn: 1, turnOrder: [1, 2], mode: 'solo' });
+  G.isSolo = true; G.soloMeta = meta; G.soloTurns = 0;
+  $('soloScreen').classList.remove('on');
+  toast(`ROUND ${meta.roundIdx + 1} / 3 시작! 상대: ${TANKS[meta.order[meta.roundIdx]].name}`);
+}
+
+function onSoloRoundEnd(playerWon) {
+  stopBgm();
+  G.phase = 'over';
+  const meta = G.soloMeta;
+  if (!playerWon) {
+    $('overText').textContent = `GAME OVER (ROUND ${meta.roundIdx + 1})`;
+    $('overText').style.color = '#ff5252';
+    $('rematchBtn').textContent = '다시 도전';
+    $('rematchBtn').onclick = () => { $('overOverlay').classList.remove('on'); openSoloPick(); };
+    $('overOverlay').classList.add('on');
+    return;
+  }
+  meta.totalTurns += G.soloTurns;
+  meta.roundIdx++;
+  if (meta.roundIdx >= 3) {
+    // 3연승 클리어! 이니셜 입력 화면으로
+    $('overOverlay').classList.remove('on');
+    showInitialsScreen(meta.totalTurns);
+  } else {
+    $('overText').textContent = `ROUND ${meta.roundIdx} CLEAR!`;
+    $('overText').style.color = 'var(--accent)';
+    $('rematchBtn').textContent = `다음 라운드 (${meta.roundIdx + 1}/3)`;
+    $('rematchBtn').onclick = () => { $('overOverlay').classList.remove('on'); startSoloRound(meta); };
+    $('overOverlay').classList.add('on');
+  }
+}
+
+/* ── 이니셜 입력 (3연승 클리어) ── */
+function showInitialsScreen(totalTurns) {
+  $('gameScreen').classList.remove('on');
+  $('initialsScoreText').textContent = `총 ${totalTurns}턴 만에 클리어!`;
+  const input = $('initialsInput');
+  input.value = '';
+  $('initialsScreen').classList.add('on');
+  setTimeout(() => input.focus(), 50);
+
+  $('initialsSubmitBtn').onclick = async () => {
+    let name = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3);
+    if (name.length === 0) name = 'AAA';
+    $('initialsSubmitBtn').disabled = true;
+    $('initialsSubmitBtn').textContent = '등록 중...';
+    try {
+      await fetch('/api/leaderboard', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, turns: totalTurns }),
+      });
+    } catch (e) { /* 등록 실패해도 결과는 계속 보여줌 */ }
+    $('initialsScreen').classList.remove('on');
+    openLeaderboard('landingScreen');
+  };
+  input.addEventListener('keydown', function onEnter(e) {
+    if (e.key === 'Enter') { $('initialsSubmitBtn').click(); input.removeEventListener('keydown', onEnter); }
+  });
+}
+
+/* ── 명예의 전당 ── */
+let leaderboardReturnTo = 'landingScreen';
+async function openLeaderboard(returnTo) {
+  leaderboardReturnTo = returnTo;
+  ['landingScreen', 'soloScreen', 'lobbyScreen', 'gameScreen', 'initialsScreen'].forEach(id => $(id).classList.remove('on'));
+  $('leaderboardScreen').classList.add('on');
+  const table = $('leaderboardTable');
+  table.innerHTML = '<tr><td style="padding:10px; color:var(--dim);">불러오는 중...</td></tr>';
+  try {
+    const res = await fetch('/api/leaderboard');
+    const list = await res.json();
+    renderLeaderboard(list);
+  } catch (e) {
+    table.innerHTML = '<tr><td style="padding:10px; color:var(--dim);">불러오지 못했습니다.</td></tr>';
+  }
+}
+function renderLeaderboard(list) {
+  const table = $('leaderboardTable');
+  if (!list || list.length === 0) {
+    table.innerHTML = '<tr><td style="padding:14px; color:var(--dim); text-align:center;">아직 3연승 클리어 기록이 없습니다. 첫 주인공이 되어보세요!</td></tr>';
+    return;
+  }
+  table.innerHTML = list.map((e, i) => `
+    <tr style="border-bottom:1px solid var(--line);">
+      <td style="padding:8px; color:var(--dim); width:30px;">${i + 1}</td>
+      <td style="padding:8px; font-weight:800; letter-spacing:3px; color:var(--accent);">${e.name}</td>
+      <td style="padding:8px; text-align:right; color:var(--text);">${e.turns}턴</td>
+    </tr>`).join('');
 }
 </script>
 <script>
