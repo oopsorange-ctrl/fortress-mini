@@ -158,13 +158,14 @@ wss.on('connection', (ws, req) => {
         broadcast(room, { type: 'lobby', lobby: room.lobby, connected: connCount(room), mode: room.mode, numPlayers: room.numPlayers });
         if (room.lobby.ready.every(Boolean) && room.players.every((p) => p)) {
           const turnOrder = buildTurnOrder(room.numPlayers);
-          room.game = { turn: turnOrder[0] };
+          const startWind = randWind();
+          room.game = { turn: turnOrder[0], wind: startWind, turnsSinceWind: 0 };
           broadcast(room, {
             type: 'start',
             map: room.lobby.map,
             tanks: room.lobby.picks,
             seed: Math.floor(Math.random() * 1e9),
-            wind: randWind(),
+            wind: startWind,
             turn: room.game.turn,
             turnOrder,
             mode: room.mode,
@@ -186,7 +187,13 @@ wss.on('connection', (ws, req) => {
       case 'turnDone':
         if (!room.game) break;
         room.game.turn = msg.nextTurn;
-        broadcast(room, { type: 'turn', turn: msg.nextTurn, wind: randWind(), sync: msg.sync });
+        room.game.turnsSinceWind = (room.game.turnsSinceWind || 0) + 1;
+        // 4턴(1:1은 각자 2번씩, 2:2는 전원 1번씩)마다 한 번만 바람이 바뀜
+        if (room.game.turnsSinceWind >= 4) {
+          room.game.wind = randWind();
+          room.game.turnsSinceWind = 0;
+        }
+        broadcast(room, { type: 'turn', turn: msg.nextTurn, wind: room.game.wind, sync: msg.sync });
         break;
 
       case 'gameover':
