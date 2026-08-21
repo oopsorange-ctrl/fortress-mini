@@ -83,7 +83,10 @@
 
   /* ── 게임 ── */
   #gameWrap { position: relative; width: 100%; }
-  #game { width: 100%; display: block; border-radius: 12px; border: 3px solid var(--line); background: #000; }
+  #game {
+    width: 100%; display: block; border-radius: 12px; border: 3px solid var(--line); background: #000;
+    touch-action: none; -webkit-touch-callout: none; user-select: none;
+  }
   #hud {
     display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; flex-wrap: wrap;
   }
@@ -98,31 +101,38 @@
   .keys { font-size: 12px; color: var(--dim); line-height: 1.7; }
   .keys kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; font-size: 11px; }
 
-  /* ── 터치 컨트롤 (모바일/태블릿 전용) ── */
+  /* ── 터치 컨트롤 (모바일/태블릿 전용) — 캔버스 위에 겹쳐서 표시해 스크롤 없이 바람을 볼 수 있게 함 ── */
   #touchControls {
     display: none; /* 기본은 숨김 — 아래 미디어쿼리로 터치 기기에서만 표시 */
-    margin-top: 10px; gap: 10px; align-items: stretch;
-    background: var(--panel); border: 2px solid var(--line); border-radius: 12px; padding: 10px;
-    user-select: none; -webkit-user-select: none;
+    position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 4;
+    justify-content: space-between; align-items: flex-end; gap: 8px;
+    pointer-events: none; /* 컨테이너는 통과, 버튼만 아래에서 다시 활성화 */
   }
+  #touchControls > * { pointer-events: auto; }
   @media (hover: none) and (pointer: coarse) {
     #touchControls { display: flex; }
     .hud-box.keys { display: none; } /* 키보드 안내는 터치 기기에서 불필요 */
   }
+  .tc-cluster {
+    display: flex; gap: 8px; background: rgba(10, 12, 30, .55); border-radius: 14px; padding: 6px;
+    backdrop-filter: blur(2px);
+  }
   .tc-group { display: flex; flex-direction: column; gap: 4px; align-items: center; }
-  .tc-label { font-size: 10px; color: var(--dim); letter-spacing: 1px; }
+  .tc-label { font-size: 9px; color: var(--dim); letter-spacing: 1px; }
   .tc-row { display: flex; gap: 6px; }
   .tc-btn {
-    width: 52px; height: 52px; border-radius: 12px; border: 2px solid var(--line);
-    background: var(--panel2); color: var(--text); font-size: 20px; font-weight: 800;
-    touch-action: none; -webkit-tap-highlight-color: transparent;
+    width: 46px; height: 46px; border-radius: 12px; border: 2px solid rgba(255,255,255,.25);
+    background: rgba(36, 44, 85, .85); color: var(--text); font-size: 18px; font-weight: 800;
+    touch-action: none; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none;
   }
   .tc-btn:active { background: var(--accent); color: #4a3800; border-color: var(--accent); }
-  .tc-btn.tc-small { width: 44px; height: 44px; font-size: 15px; }
+  .tc-btn.tc-small { width: 38px; height: 38px; font-size: 13px; }
   .tc-btn.tc-small.sel { background: var(--accent); color: #4a3800; border-color: var(--accent); }
   #tcFire {
-    flex: 1; min-width: 90px; border-radius: 12px; border: 0; background: #ff5252; color: #fff;
-    font-weight: 800; font-size: 14px; line-height: 1.3; touch-action: none; -webkit-tap-highlight-color: transparent;
+    width: 84px; height: 84px; border-radius: 50%; border: 3px solid rgba(255,255,255,.35);
+    background: rgba(255, 82, 82, .9); color: #fff;
+    font-weight: 800; font-size: 13px; line-height: 1.2; touch-action: none;
+    -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none;
   }
   #tcFire:active, #tcFire.charging { background: #ffd93d; color: #4a3800; }
 
@@ -332,6 +342,36 @@
       <h2 id="overText">승리!</h2>
       <button id="rematchBtn">로비로 돌아가기</button>
     </div>
+
+    <!-- 모바일/태블릿 터치 컨트롤 — 캔버스 위에 겹쳐서 표시 (스크롤 없이 바람 확인 가능) -->
+    <div id="touchControls">
+      <div class="tc-cluster">
+        <div class="tc-group">
+          <div class="tc-label">이동</div>
+          <div class="tc-row">
+            <button class="tc-btn" id="tcLeft">◀</button>
+            <button class="tc-btn" id="tcRight">▶</button>
+          </div>
+        </div>
+        <div class="tc-group">
+          <div class="tc-label">각도</div>
+          <div class="tc-row">
+            <button class="tc-btn" id="tcAngleUp">◤</button>
+            <button class="tc-btn" id="tcAngleDown">◥</button>
+          </div>
+        </div>
+      </div>
+      <div class="tc-cluster">
+        <div class="tc-group">
+          <div class="tc-label">무기</div>
+          <div class="tc-row">
+            <button class="tc-btn tc-small" id="tcW0">①</button>
+            <button class="tc-btn tc-small" id="tcW1">②</button>
+          </div>
+        </div>
+        <button id="tcFire">발사!</button>
+      </div>
+    </div>
   </div>
   <div id="hud">
     <div class="hud-box">
@@ -347,32 +387,6 @@
     <div class="hud-box">
       <button class="wbtn" id="muteBtn" style="min-width:auto;">🔊</button>
     </div>
-  </div>
-
-  <!-- 모바일/태블릿 터치 컨트롤 (PC에서는 CSS로 숨김) -->
-  <div id="touchControls">
-    <div class="tc-group">
-      <div class="tc-label">이동</div>
-      <div class="tc-row">
-        <button class="tc-btn" id="tcLeft">◀</button>
-        <button class="tc-btn" id="tcRight">▶</button>
-      </div>
-    </div>
-    <div class="tc-group">
-      <div class="tc-label">각도</div>
-      <div class="tc-row">
-        <button class="tc-btn" id="tcAngleUp">◤</button>
-        <button class="tc-btn" id="tcAngleDown">◥</button>
-      </div>
-    </div>
-    <div class="tc-group">
-      <div class="tc-label">무기</div>
-      <div class="tc-row">
-        <button class="tc-btn tc-small" id="tcW0">①</button>
-        <button class="tc-btn tc-small" id="tcW1">②</button>
-      </div>
-    </div>
-    <button id="tcFire">누르고 떼면<br>발사!</button>
   </div>
 </div>
 
@@ -845,6 +859,13 @@ const tcFireBtn = $('tcFire');
 tcFireBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); tcFireBtn.classList.add('charging'); startCharge(); });
 ['pointerup', 'pointercancel', 'pointerleave'].forEach((ev) => {
   tcFireBtn.addEventListener(ev, (e) => { e.preventDefault(); tcFireBtn.classList.remove('charging'); releaseCharge(); });
+});
+
+// 롱프레스(꾹 누르기) 시 브라우저 컨텍스트 메뉴/텍스트 선택 콜아웃이 뜨는 것을 막음
+// (발사 버튼은 길게 눌러 파워를 충전하는 조작이라 특히 필요)
+['contextmenu', 'selectstart', 'dragstart'].forEach((ev) => {
+  $('touchControls').addEventListener(ev, (e) => e.preventDefault());
+  cv.addEventListener(ev, (e) => e.preventDefault());
 });
 
 function fireMine() {
