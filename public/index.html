@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>포트리스 미니</title>
 <style>
   :root {
@@ -22,7 +22,7 @@
     color: var(--text);
     font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
     min-height: 100vh; display: flex; flex-direction: column; align-items: center;
-    padding: 16px; user-select: none;
+    padding: 16px; user-select: none; overscroll-behavior: none;
   }
   h1 { font-size: 26px; letter-spacing: 6px; margin: 8px 0 2px; color: var(--accent); text-shadow: 0 3px 0 #7a5a00; }
   .sub { color: var(--dim); font-size: 13px; margin-bottom: 14px; letter-spacing: 2px; }
@@ -97,6 +97,34 @@
   .wbtn small { display: block; color: var(--dim); font-size: 11px; margin-top: 2px; }
   .keys { font-size: 12px; color: var(--dim); line-height: 1.7; }
   .keys kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; font-size: 11px; }
+
+  /* ── 터치 컨트롤 (모바일/태블릿 전용) ── */
+  #touchControls {
+    display: none; /* 기본은 숨김 — 아래 미디어쿼리로 터치 기기에서만 표시 */
+    margin-top: 10px; gap: 10px; align-items: stretch;
+    background: var(--panel); border: 2px solid var(--line); border-radius: 12px; padding: 10px;
+    user-select: none; -webkit-user-select: none;
+  }
+  @media (hover: none) and (pointer: coarse) {
+    #touchControls { display: flex; }
+    .hud-box.keys { display: none; } /* 키보드 안내는 터치 기기에서 불필요 */
+  }
+  .tc-group { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+  .tc-label { font-size: 10px; color: var(--dim); letter-spacing: 1px; }
+  .tc-row { display: flex; gap: 6px; }
+  .tc-btn {
+    width: 52px; height: 52px; border-radius: 12px; border: 2px solid var(--line);
+    background: var(--panel2); color: var(--text); font-size: 20px; font-weight: 800;
+    touch-action: none; -webkit-tap-highlight-color: transparent;
+  }
+  .tc-btn:active { background: var(--accent); color: #4a3800; border-color: var(--accent); }
+  .tc-btn.tc-small { width: 44px; height: 44px; font-size: 15px; }
+  .tc-btn.tc-small.sel { background: var(--accent); color: #4a3800; border-color: var(--accent); }
+  #tcFire {
+    flex: 1; min-width: 90px; border-radius: 12px; border: 0; background: #ff5252; color: #fff;
+    font-weight: 800; font-size: 14px; line-height: 1.3; touch-action: none; -webkit-tap-highlight-color: transparent;
+  }
+  #tcFire:active, #tcFire.charging { background: #ffd93d; color: #4a3800; }
 
   /* ── 오버레이 ── */
   .overlay {
@@ -239,7 +267,7 @@
     </div>
 
     <div class="howto-warn">
-      ⚠️ PC 브라우저 전용입니다 (키보드로 조작해서 모바일에서는 화면만 뜨고 조작이 안 돼요).<br>
+      📱 모바일/태블릿에서는 게임 화면 아래에 터치 버튼이 자동으로 나타나요 (PC는 키보드 그대로 사용).<br>
       처음 접속 시 로딩에 20~30초 정도 걸릴 수 있어요 — 새로고침 연타하지 말고 잠깐 기다려주세요.<br>
       서로 다른 방 코드를 쓰면 여러 그룹이 동시에 플레이할 수 있어요.
     </div>
@@ -319,6 +347,32 @@
     <div class="hud-box">
       <button class="wbtn" id="muteBtn" style="min-width:auto;">🔊</button>
     </div>
+  </div>
+
+  <!-- 모바일/태블릿 터치 컨트롤 (PC에서는 CSS로 숨김) -->
+  <div id="touchControls">
+    <div class="tc-group">
+      <div class="tc-label">이동</div>
+      <div class="tc-row">
+        <button class="tc-btn" id="tcLeft">◀</button>
+        <button class="tc-btn" id="tcRight">▶</button>
+      </div>
+    </div>
+    <div class="tc-group">
+      <div class="tc-label">각도</div>
+      <div class="tc-row">
+        <button class="tc-btn" id="tcAngleUp">◤</button>
+        <button class="tc-btn" id="tcAngleDown">◥</button>
+      </div>
+    </div>
+    <div class="tc-group">
+      <div class="tc-label">무기</div>
+      <div class="tc-row">
+        <button class="tc-btn tc-small" id="tcW0">①</button>
+        <button class="tc-btn tc-small" id="tcW1">②</button>
+      </div>
+    </div>
+    <button id="tcFire">누르고 떼면<br>발사!</button>
   </div>
 </div>
 
@@ -735,6 +789,7 @@ function buildWeaponBtns() {
 }
 function updateWeaponBtns() {
   [0, 1].forEach(i => $('w' + i + 'btn').classList.toggle('sel', me().weapon === i));
+  [0, 1].forEach(i => $('tcW' + i).classList.toggle('sel', me().weapon === i));
 }
 function selectWeapon(i) {
   if (!G) return;
@@ -742,22 +797,54 @@ function selectWeapon(i) {
   if (isMyTurn()) send({ type: 'aim', angle: me().angle, weapon: i });
 }
 
-/* ── 입력 ── */
+/* ── 충전/발사 (키보드 SPACE와 터치 발사 버튼이 공용으로 사용) ── */
+function startCharge() {
+  if (!G || !isMyTurn() || G.charging) return;
+  G.charging = true; G.power = 0;
+}
+function releaseCharge() {
+  if (!G || !G.charging) return;
+  G.charging = false;
+  if (isMyTurn() && G.power >= 8) fireMine();
+}
+
+/* ── 입력 (키보드) ── */
 const keys = {};
 window.addEventListener('keydown', (e) => {
   if (!G) return;
   if (['ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault();
   if (e.key === '1') selectWeapon(0);
   if (e.key === '2') selectWeapon(1);
-  if (e.key === ' ' && isMyTurn() && !keys[' ']) { G.charging = true; G.power = 0; }
+  if (e.key === ' ' && !keys[' ']) startCharge();
   keys[e.key] = true;
 });
 window.addEventListener('keyup', (e) => {
   keys[e.key] = false;
-  if (e.key === ' ' && G && G.charging) {
-    G.charging = false;
-    if (isMyTurn() && G.power >= 8) fireMine();
-  }
+  if (e.key === ' ') releaseCharge();
+});
+
+/* ── 입력 (터치 — 모바일/태블릿 온스크린 버튼) ──
+   이동/각도 버튼은 keys 객체를 그대로 재사용해 키보드 로직과 동일하게 동작시킨다. */
+function bindHold(el, keyName) {
+  const start = (e) => { e.preventDefault(); keys[keyName] = true; };
+  const end = (e) => { e.preventDefault(); keys[keyName] = false; };
+  el.addEventListener('pointerdown', start);
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+  el.addEventListener('pointerleave', end);
+}
+bindHold($('tcLeft'), 'a');
+bindHold($('tcRight'), 'd');
+bindHold($('tcAngleUp'), 'ArrowLeft');
+bindHold($('tcAngleDown'), 'ArrowRight');
+
+$('tcW0').addEventListener('pointerdown', (e) => { e.preventDefault(); selectWeapon(0); });
+$('tcW1').addEventListener('pointerdown', (e) => { e.preventDefault(); selectWeapon(1); });
+
+const tcFireBtn = $('tcFire');
+tcFireBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); tcFireBtn.classList.add('charging'); startCharge(); });
+['pointerup', 'pointercancel', 'pointerleave'].forEach((ev) => {
+  tcFireBtn.addEventListener(ev, (e) => { e.preventDefault(); tcFireBtn.classList.remove('charging'); releaseCharge(); });
 });
 
 function fireMine() {
