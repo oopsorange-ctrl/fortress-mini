@@ -159,6 +159,13 @@
     -webkit-user-drag: none; outline: none;
   }
   #tcFire:active, #tcFire.charging { background: #ffd93d; color: #4a3800; }
+  .tc-fire-wrap { position: relative; width: 84px; height: 84px; }
+  .tc-fire-wrap #tcFire { position: absolute; inset: 0; }
+  .tc-fire-gauge {
+    position: absolute; inset: 0; pointer-events: none; z-index: 1;
+    filter: drop-shadow(0 0 3px rgba(255, 217, 61, .8));
+  }
+  #tcFireGaugeFill { transition: stroke 0.15s; }
 
   /* ── 오버레이 ── */
   .overlay {
@@ -393,7 +400,12 @@
             <button class="tc-btn tc-small" id="tcW1">②</button>
           </div>
         </div>
-        <button id="tcFire">발사!</button>
+        <div class="tc-fire-wrap">
+          <svg class="tc-fire-gauge" viewBox="0 0 100 100" width="84" height="84">
+            <path id="tcFireGaugeFill" fill="none" stroke="#ffd93d" stroke-width="7" stroke-linecap="round" />
+          </svg>
+          <button id="tcFire">발사!</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1344,9 +1356,29 @@ function loop(now) {
   G.explosions = G.explosions.filter(e => (e.life += dt) < 0.5);
   G.texts = G.texts.filter(t => (t.life += dt) < 1.4);
 
+  updateFireGauge();
   render();
 }
 requestAnimationFrame(loop);
+
+/* ── 발사 버튼(터치) 원형 파워 게이지: 버튼 왼쪽 반원, 아래(0%)에서 왼쪽을 타고 위(100%)까지 채움 ── */
+const tcFireGaugeFill = document.getElementById('tcFireGaugeFill');
+function updateFireGauge() {
+  const showing = G && G.charging && isMyTurn();
+  const pct = showing ? Math.max(0, Math.min(100, G.power)) : 0;
+  if (pct <= 0) { tcFireGaugeFill.setAttribute('d', ''); return; }
+  const cx = 50, cy = 50, r = 44;
+  const startDeg = 180;                    // 6시 방향(아래) = 0%
+  const endDeg = 180 + 180 * (pct / 100);   // 12시 방향(위) = 100%, 왼쪽(9시)을 거쳐서
+  const toXY = (deg) => {
+    const rad = deg * Math.PI / 180;
+    return [cx + r * Math.sin(rad), cy - r * Math.cos(rad)];
+  };
+  const [sx, sy] = toXY(startDeg);
+  const [ex, ey] = toXY(endDeg);
+  const largeArc = (endDeg - startDeg) > 180 ? 1 : 0;
+  tcFireGaugeFill.setAttribute('d', `M ${sx} ${sy} A ${r} ${r} 0 ${largeArc} 1 ${ex} ${ey}`);
+}
 
 /* ═══════════════════════════════════════════════
    렌더링
