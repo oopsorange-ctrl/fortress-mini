@@ -153,6 +153,7 @@ wss.on('connection', (ws, req) => {
 
       case 'ready':
         if (room.lobby.picks[ws.slot] == null) break;
+        if (room.game) break; // 이미 게임이 진행 중이면 무시 (재시작으로 인한 HP 리셋 버그 방지)
         room.lobby.ready[ws.slot] = true;
         broadcast(room, { type: 'lobby', lobby: room.lobby, connected: connCount(room), mode: room.mode, numPlayers: room.numPlayers });
         if (room.lobby.ready.every(Boolean) && room.players.every((p) => p)) {
