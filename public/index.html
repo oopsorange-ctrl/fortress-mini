@@ -158,18 +158,18 @@
     -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
     -webkit-user-drag: none; outline: none;
   }
-  #tcFire:active, #tcFire.charging { background: #ffd93d; color: #4a3800; }
-  .tc-fire-wrap { position: relative; width: 84px; height: 84px; }
-  .tc-fire-wrap #tcFire { position: absolute; inset: 0; }
+  #tcFire:active { border-color: #fff; } /* 눌렀을 때 색은 그대로, 테두리만 살짝 밝게 */
+  #tcFire.charging { border-color: #fff; }
+  .tc-fire-wrap { position: relative; width: 112px; height: 112px; }
+  .tc-fire-wrap #tcFire { position: absolute; top: 14px; left: 14px; }
   .tc-fire-gauge {
     position: absolute; inset: 0; pointer-events: none; z-index: 2;
   }
   #tcFireGaugeTrack { opacity: .35; }
   #tcFireGaugeFill {
     transition: stroke 0.15s;
-    stroke: #ffffff;
-    paint-order: stroke;
-    filter: drop-shadow(0 0 2px #000) drop-shadow(0 0 2px #000);
+    stroke: #ffd93d;
+    filter: drop-shadow(0 0 3px #ffd93d) drop-shadow(0 0 5px rgba(0,0,0,.6));
   }
 
   /* ── 오버레이 ── */
@@ -406,10 +406,10 @@
           </div>
         </div>
         <div class="tc-fire-wrap">
-          <svg class="tc-fire-gauge" viewBox="0 0 100 100" width="84" height="84">
-            <path id="tcFireGaugeTrack" fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round"
-              d="M 50 94 A 44 44 0 0 1 6 50 A 44 44 0 0 1 50 6" />
-            <path id="tcFireGaugeFill" fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round" />
+          <svg class="tc-fire-gauge" viewBox="0 0 112 112" width="112" height="112">
+            <path id="tcFireGaugeTrack" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round"
+              d="M 56 106 A 50 50 0 0 1 6 56 A 50 50 0 0 1 56 6" />
+            <path id="tcFireGaugeFill" fill="none" stroke="#ffd93d" stroke-width="8" stroke-linecap="round" />
           </svg>
           <button id="tcFire">발사!</button>
         </div>
@@ -1374,7 +1374,7 @@ function updateFireGauge() {
   const showing = G && G.charging && isMyTurn();
   const pct = showing ? Math.max(0, Math.min(100, G.power)) : 0;
   if (pct <= 0) { tcFireGaugeFill.setAttribute('d', ''); return; }
-  const cx = 50, cy = 50, r = 44;
+  const cx = 56, cy = 56, r = 50;
   const startDeg = 180;                    // 6시 방향(아래) = 0%
   const endDeg = 180 + 180 * (pct / 100);   // 12시 방향(위) = 100%, 왼쪽(9시)을 거쳐서
   const toXY = (deg) => {
