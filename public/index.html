@@ -4,6 +4,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>포트리스 미니</title>
+<script>
+  // 터치 지원 여부를 최대한 일찍 감지해서 body에 클래스로 표시.
+  // CSS의 (hover:none)/(pointer:coarse) 미디어쿼리를 못 알아듣는 인앱 브라우저(카카오톡, 일부 삼성 인터넷 등)에 대한 이중 안전장치.
+  (function () {
+    var isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (navigator.msMaxTouchPoints > 0);
+    if (isTouch) document.documentElement.className += ' is-touch-device';
+    document.addEventListener('DOMContentLoaded', function () {
+      if (isTouch) document.body.classList.add('is-touch');
+    });
+    // 혹시 위 감지에서 놓친 기기라도, 실제 터치 이벤트가 한 번이라도 발생하면 즉시 켜준다.
+    window.addEventListener('touchstart', function onFirstTouch() {
+      document.body.classList.add('is-touch');
+      window.removeEventListener('touchstart', onFirstTouch);
+    }, { passive: true });
+  })();
+</script>
 <style>
   :root {
     --bg: #10142a;
@@ -113,6 +129,10 @@
     #touchControls { display: flex; }
     .hud-box.keys { display: none; } /* 키보드 안내는 터치 기기에서 불필요 */
   }
+  /* 일부 인앱 브라우저(카카오톡, 삼성 인터넷 등)는 위 미디어쿼리를 정확히 인식 못 할 때가 있어
+     JS로 터치 이벤트를 직접 감지해 body에 클래스를 붙이는 방식으로 이중 안전장치를 둔다. */
+  body.is-touch #touchControls { display: flex; }
+  body.is-touch .hud-box.keys { display: none; }
   .tc-cluster {
     display: flex; gap: 8px; background: rgba(10, 12, 30, .55); border-radius: 14px; padding: 6px;
     backdrop-filter: blur(2px);
@@ -123,7 +143,9 @@
   .tc-btn {
     width: 46px; height: 46px; border-radius: 12px; border: 2px solid rgba(255,255,255,.25);
     background: rgba(36, 44, 85, .85); color: var(--text); font-size: 18px; font-weight: 800;
-    touch-action: none; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none;
+    touch-action: none; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none;
+    -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
+    -webkit-user-drag: none; outline: none;
   }
   .tc-btn:active { background: var(--accent); color: #4a3800; border-color: var(--accent); }
   .tc-btn.tc-small { width: 38px; height: 38px; font-size: 13px; }
@@ -132,7 +154,9 @@
     width: 84px; height: 84px; border-radius: 50%; border: 3px solid rgba(255,255,255,.35);
     background: rgba(255, 82, 82, .9); color: #fff;
     font-weight: 800; font-size: 13px; line-height: 1.2; touch-action: none;
-    -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none;
+    -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none;
+    -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
+    -webkit-user-drag: none; outline: none;
   }
   #tcFire:active, #tcFire.charging { background: #ffd93d; color: #4a3800; }
 
@@ -839,6 +863,14 @@ window.addEventListener('keyup', (e) => {
 
 /* ── 입력 (터치 — 모바일/태블릿 온스크린 버튼) ──
    이동/각도 버튼은 keys 객체를 그대로 재사용해 키보드 로직과 동일하게 동작시킨다. */
+// 터치 컨트롤 버튼 공용: pointer 이벤트뿐 아니라 touchstart 자체도 막아서
+// 브라우저가 "길게 누르기"를 텍스트선택/컨텍스트메뉴로 인식하는 걸 원천 차단한다.
+function killNativeTouch(el) {
+  el.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+  el.addEventListener('touchend', (e) => e.preventDefault(), { passive: false });
+  el.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+}
+
 function bindHold(el, keyName) {
   const start = (e) => { e.preventDefault(); keys[keyName] = true; };
   const end = (e) => { e.preventDefault(); keys[keyName] = false; };
@@ -846,6 +878,7 @@ function bindHold(el, keyName) {
   el.addEventListener('pointerup', end);
   el.addEventListener('pointercancel', end);
   el.addEventListener('pointerleave', end);
+  killNativeTouch(el);
 }
 bindHold($('tcLeft'), 'a');
 bindHold($('tcRight'), 'd');
@@ -854,12 +887,15 @@ bindHold($('tcAngleDown'), 'ArrowRight');
 
 $('tcW0').addEventListener('pointerdown', (e) => { e.preventDefault(); selectWeapon(0); });
 $('tcW1').addEventListener('pointerdown', (e) => { e.preventDefault(); selectWeapon(1); });
+killNativeTouch($('tcW0'));
+killNativeTouch($('tcW1'));
 
 const tcFireBtn = $('tcFire');
 tcFireBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); tcFireBtn.classList.add('charging'); startCharge(); });
 ['pointerup', 'pointercancel', 'pointerleave'].forEach((ev) => {
   tcFireBtn.addEventListener(ev, (e) => { e.preventDefault(); tcFireBtn.classList.remove('charging'); releaseCharge(); });
 });
+killNativeTouch(tcFireBtn);
 
 // 롱프레스(꾹 누르기) 시 브라우저 컨텍스트 메뉴/텍스트 선택 콜아웃이 뜨는 것을 막음
 // (발사 버튼은 길게 눌러 파워를 충전하는 조작이라 특히 필요)
