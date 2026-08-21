@@ -1045,7 +1045,9 @@ function resolveSoloOutcome() {
     onSoloRoundEnd(team1Alive); // 플레이어 생존 = 승리
     return;
   }
-  G.wind = randWindClient();
+  G.turnsSinceWind = (G.turnsSinceWind || 0) + 1;
+  // 4턴(양쪽 각 2번씩)마다 한 번만 바람이 바뀜
+  if (G.turnsSinceWind >= 4) { G.wind = randWindClient(); G.turnsSinceWind = 0; }
   G.turn = computeNextTurn();
   G.phase = 'aim'; G.power = 0; G.charging = false;
   const t = activeTank();
@@ -1170,7 +1172,7 @@ function startSoloRound(meta) {
   const seed = Math.floor(Math.random() * 1e9);
   const wind = randWindClient();
   startGame({ map, tanks: [meta.playerTank, meta.order[meta.roundIdx]], seed, wind, turn: 1, turnOrder: [1, 2], mode: 'solo' });
-  G.isSolo = true; G.soloMeta = meta; G.soloTurns = 0;
+  G.isSolo = true; G.soloMeta = meta; G.soloTurns = 0; G.turnsSinceWind = 0;
   $('soloScreen').classList.remove('on');
   toast(`ROUND ${meta.roundIdx + 1} / 3 시작! 상대: ${TANKS[meta.order[meta.roundIdx]].name}`);
 }
