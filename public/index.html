@@ -162,10 +162,15 @@
   .tc-fire-wrap { position: relative; width: 84px; height: 84px; }
   .tc-fire-wrap #tcFire { position: absolute; inset: 0; }
   .tc-fire-gauge {
-    position: absolute; inset: 0; pointer-events: none; z-index: 1;
-    filter: drop-shadow(0 0 3px rgba(255, 217, 61, .8));
+    position: absolute; inset: 0; pointer-events: none; z-index: 2;
   }
-  #tcFireGaugeFill { transition: stroke 0.15s; }
+  #tcFireGaugeTrack { opacity: .35; }
+  #tcFireGaugeFill {
+    transition: stroke 0.15s;
+    stroke: #ffffff;
+    paint-order: stroke;
+    filter: drop-shadow(0 0 2px #000) drop-shadow(0 0 2px #000);
+  }
 
   /* ── 오버레이 ── */
   .overlay {
@@ -402,7 +407,9 @@
         </div>
         <div class="tc-fire-wrap">
           <svg class="tc-fire-gauge" viewBox="0 0 100 100" width="84" height="84">
-            <path id="tcFireGaugeFill" fill="none" stroke="#ffd93d" stroke-width="7" stroke-linecap="round" />
+            <path id="tcFireGaugeTrack" fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round"
+              d="M 50 94 A 44 44 0 0 1 6 50 A 44 44 0 0 1 50 6" />
+            <path id="tcFireGaugeFill" fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round" />
           </svg>
           <button id="tcFire">발사!</button>
         </div>
